@@ -21,6 +21,11 @@ This is a **complete professional solution** with:
 - 💻 **Tauri Desktop Client** (Windows/Mac/Linux)
 - 🔌 **USB Connection Support** (low latency, more stable)
 - 📡 **WiFi Connection Support** (wireless freedom)
+
+## Documentation
+
+- [Quick start](docs/QUICKSTART.md)
+- [USB connection](docs/USB_CONNECTION.md)
 ## Components
 
 ### AWC — Desktop Client

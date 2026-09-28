@@ -4,21 +4,18 @@ For experienced developers who want to get started immediately.
 
 ## Prerequisites
 - ADB installed and configured in path on your system (I may or may not be include a autoconfigure feature later).
-- Android Studio OR Xcode (for mobile builds)
+- Android SDK command-line tools and JDK 21 (for mobile builds)
 - Phone and PC on same WiFi network
 
 ## 1. Install All Dependencies (5 min)
 
 ```bash
 
-# Mobile App
-use Android Studio to open the Project /MobileWebcam
+# Android App
+cd android && ./gradlew :app:assembleDebug && cd ..
 
 # Desktop Client
-cd desktop-client && npm install && cd ..
-
-# React Native CLI (if not installed)
-npm install -g react-native-cli
+cd desktop && pnpm install && cd ..
 ```
 
 ## 2. Start Everything (2 min)
@@ -27,11 +24,11 @@ Open 1 terminal:
 
 **Terminal 1 - Desktop Client:**
 ```bash
-cd desktop-client && npm start
+cd desktop && pnpm run dev
 ```
-**In Android Studio**
+**Android build**
 ```bash 
--  Sync and build (Assuming you know basics)
+cd android && ./gradlew :app:assembleDebug
 ```
 
 ## 4. Connect (2 min)
@@ -51,15 +48,9 @@ cd desktop-client && npm start
 # Linux: sudo ufw allow 8080
 ```
 
-**Metro bundler issues?**
-```bash
-cd mobile-app
-npx react-native start --reset-cache
-```
-
 **Android build errors?**
 ```bash
-cd mobile-app/android && ./gradlew clean && cd ../..
+cd android && ./gradlew clean
 ```
 
 ## Tips for Best Performance (for low end phones)
@@ -71,16 +62,6 @@ cd mobile-app/android && ./gradlew clean && cd ../..
 
 ## Building Release Versions
 
-**Desktop (Windows):**
-```bash
-cd desktop-client && npm run build:win
-```
-
-**Desktop (Mac):**
-```bash
-cd desktop-client && npm run build:mac
-```
-
 **Desktop (Linux):**
 ```bash
 ./scripts/build-linux-client.sh
@@ -90,4 +71,4 @@ cd desktop-client && npm run build:mac
 
 You now have a working mobile webcam system. Customize, improve, share!
 
-For detailed setup, see INSTALLATION.md
+For USB setup, see [USB_CONNECTION.md](USB_CONNECTION.md).

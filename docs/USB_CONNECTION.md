@@ -70,11 +70,11 @@ This makes `localhost:8080` on your PC connect to `localhost:8080` on your Phone
 ### 6. Start Everything
 **Terminal 1 - Desktop Client:**
 ```bash
-cd desktop-client && npm start
+cd desktop && pnpm install && pnpm run dev
 ```
-**In Android Studio**
+**Android build:**
 ```bash 
--  Sync and build (Assuming you know basics)
+cd android && ./gradlew :app:assembleDebug
 ```
 The app will automatically install and run on your USB-connected phone!
 
