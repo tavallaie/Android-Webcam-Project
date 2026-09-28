@@ -1,4 +1,4 @@
-package com.sjbtechnologies.awa
+package com.soubhagyajit.awa
 
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -23,7 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import com.sjbtechnologies.awa.ui.theme.AWATheme
+import com.soubhagyajit.awa.ui.theme.AWATheme
 
 class HelpActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -282,4 +282,3 @@ fun ApiEndpointCard(
         }
     }
 }
-

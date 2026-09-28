@@ -1,4 +1,4 @@
-package com.sjbtechnologies.awa.ui.components
+package com.soubhagyajit.awa.ui.components
 
 import android.util.Log
 import android.view.MotionEvent
@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.camera.view.PreviewView
 import com.pedro.library.view.OpenGlView
-import com.sjbtechnologies.awa.viewModel.CameraViewModel
+import com.soubhagyajit.awa.viewModel.CameraViewModel
 
 @Composable
 fun Preview(

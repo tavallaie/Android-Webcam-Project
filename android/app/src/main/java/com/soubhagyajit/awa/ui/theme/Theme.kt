@@ -1,4 +1,4 @@
-package com.sjbtechnologies.awa.ui.theme
+package com.soubhagyajit.awa.ui.theme
 
 import android.app.Activity
 import android.os.Build

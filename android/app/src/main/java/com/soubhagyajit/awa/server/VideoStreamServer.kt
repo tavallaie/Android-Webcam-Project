@@ -1,7 +1,7 @@
-package com.sjbtechnologies.awa.server
+package com.soubhagyajit.awa.server
 
 import android.util.Log
-import com.sjbtechnologies.awa.viewModel.CameraViewModel
+import com.soubhagyajit.awa.viewModel.CameraViewModel
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.*

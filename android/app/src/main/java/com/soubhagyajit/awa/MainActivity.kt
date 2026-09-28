@@ -1,4 +1,4 @@
-package com.sjbtechnologies.awa
+package com.soubhagyajit.awa
 
 import android.Manifest
 import android.content.Intent
@@ -84,9 +84,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.sjbtechnologies.awa.ui.theme.AWATheme
-import com.sjbtechnologies.awa.ui.components.Preview
-import com.sjbtechnologies.awa.viewModel.CameraViewModel
+import com.soubhagyajit.awa.ui.theme.AWATheme
+import com.soubhagyajit.awa.ui.components.Preview
+import com.soubhagyajit.awa.viewModel.CameraViewModel
 import java.net.Inet4Address
 import java.net.NetworkInterface
 

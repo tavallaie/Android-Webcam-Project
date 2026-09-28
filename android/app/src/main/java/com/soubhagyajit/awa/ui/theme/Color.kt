@@ -1,4 +1,4 @@
-package com.sjbtechnologies.awa.ui.theme
+package com.soubhagyajit.awa.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

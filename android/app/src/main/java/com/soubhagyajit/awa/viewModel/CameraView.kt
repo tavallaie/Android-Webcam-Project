@@ -1,4 +1,4 @@
-package com.sjbtechnologies.awa.viewModel
+package com.soubhagyajit.awa.viewModel
 
 import android.content.Context
 import android.graphics.ImageFormat
@@ -37,7 +37,7 @@ import com.pedro.common.ConnectChecker
 import com.pedro.library.rtsp.RtspCamera2
 import com.pedro.library.view.OpenGlView
 import com.pedro.rtspserver.RtspServerCamera2
-import com.sjbtechnologies.awa.server.VideoStreamServer
+import com.soubhagyajit.awa.server.VideoStreamServer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
