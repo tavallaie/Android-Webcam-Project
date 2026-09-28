@@ -13,9 +13,17 @@ For experienced developers who want to get started immediately.
 
 # Android App
 ./scripts/build-android.sh debug
+./scripts/install-android.sh debug
 
 # Desktop Client
 cd desktop && pnpm install && cd ..
+```
+
+`install-android.sh` automatically uses the only connected device. If more than one
+device is connected, pass its ADB serial:
+
+```bash
+./scripts/install-android.sh debug RFCT70M3S7W
 ```
 
 ## 2. Start Everything (2 min)
