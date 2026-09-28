@@ -56,6 +56,13 @@ function Home() {
   const [virtualCamActive, setVirtualCamActive] = useState(false);
   const [streamData, setStreamData] = useState({ width: 720, height: 1280 });
 
+  const mjpegUrl = phoneIP.trim()
+    ? `http://${phoneIP.trim()}:${httpPort}/video`
+    : "";
+  const rtspUrl = phoneIP.trim()
+    ? `rtsp://${phoneIP.trim()}:${rtspPort}`
+    : "";
+
   const [showControls, setShowControls] = useState(false);
   const [resolutions, setResolutions] = useState([]);
   const [camera, setCamera] = useState("back");
@@ -204,6 +211,16 @@ function Home() {
     }
   };
 
+  const copyStreamUrl = async (url, label) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(`${label} URL copied`, false);
+    } catch (err) {
+      console.error("Could not copy stream URL:", err);
+      showToast("Could not copy URL", true);
+    }
+  };
+
   const showToast = (message, isError = false) => {
     setToast({ message, isError, visible: true });
     setTimeout(() => setToast((t) => ({ ...t, visible: false })), 3000);
@@ -261,7 +278,7 @@ function Home() {
 
       if (isRtsp) {
         protocol = "rtsp";
-        const port = features.stream_port || rtspPort;
+        const port = features.rtsp_port || rtspPort;
         setRtspPort(port);
         targetUrl = `rtsp://${phoneIP}:${port}`;
       }
@@ -829,6 +846,56 @@ function Home() {
               {!vc ? "Start Virtual Cam" : "Stop"}
             </button>
           </div>
+
+          {isConnected && (
+            <div className="space-y-2 pt-2 border-t border-slate-800">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  OBS / direct stream
+                </label>
+                <p className="mt-1 text-[10px] leading-snug text-slate-500">
+                  Use these URLs if the virtual camera is unavailable. In OBS,
+                  add a Media Source and paste the matching URL.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-semibold text-slate-400">
+                  MJPEG
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <code className="min-w-0 flex-1 truncate rounded-md border border-slate-700 bg-slate-950/60 px-2 py-1.5 text-[10px] text-slate-300">
+                    {mjpegUrl}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => copyStreamUrl(mjpegUrl, "MJPEG")}
+                    className="shrink-0 rounded-md border border-slate-700 px-2 py-1.5 text-[10px] text-slate-300 transition-colors hover:border-brand-500/50 hover:text-brand-400"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-semibold text-slate-400">
+                  RTSP
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <code className="min-w-0 flex-1 truncate rounded-md border border-slate-700 bg-slate-950/60 px-2 py-1.5 text-[10px] text-slate-300">
+                    {rtspUrl}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => copyStreamUrl(rtspUrl, "RTSP")}
+                    className="shrink-0 rounded-md border border-slate-700 px-2 py-1.5 text-[10px] text-slate-300 transition-colors hover:border-brand-500/50 hover:text-brand-400"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-auto p-2 bg-slate-900/80 rounded-lg border border-slate-800/50 shrink-0">
             <div className="flex items-center justify-between mb-1">

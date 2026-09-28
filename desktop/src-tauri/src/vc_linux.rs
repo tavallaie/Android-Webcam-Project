@@ -13,9 +13,9 @@ use zune_jpeg::JpegDecoder;
 pub const CARD_LABEL: &str = "AWC Virtual Cam";
 
 pub fn missing_loopback_error() -> String {
-    "v4l2loopback is not available. Install and load it, then start Virtual Cam again:\n\
+    "v4l2loopback is not available or is not configured for video output. Install and load it, then start Virtual Cam again:\n\
      sudo apt-get install v4l2loopback-dkms\n\
-     sudo modprobe v4l2loopback devices=1 card_label=\"AWC Virtual Cam\" exclusive_caps=1"
+     sudo modprobe v4l2loopback devices=1 card_label=\"AWC Virtual Cam\" exclusive_caps=0"
         .to_string()
 }
 
@@ -204,7 +204,6 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
         .trim()
     )));
 
-    // exclusive_caps=1 only advertises CAPTURE while a producer keeps writing.
     while CAM_RUNNING.load(Ordering::Relaxed) {
         if let Some(frame) = LATEST_FRAME.lock().unwrap().take() {
             match frame {

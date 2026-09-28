@@ -87,7 +87,15 @@ Load a loopback device before **Start Virtual Cam**:
 
 ```bash
 sudo apt-get install v4l2loopback-dkms
-sudo modprobe v4l2loopback devices=1 card_label="AWC Virtual Cam" exclusive_caps=1
+sudo modprobe v4l2loopback devices=1 card_label="AWC Virtual Cam" exclusive_caps=0
+```
+
+If v4l2loopback was already loaded with `exclusive_caps=1`, reload it once so
+the new setting takes effect:
+
+```bash
+sudo modprobe -r v4l2loopback
+sudo modprobe v4l2loopback devices=1 card_label="AWC Virtual Cam" exclusive_caps=0
 ```
 
 Then pick **AWC Virtual Cam** in Zoom, Meet, or OBS. `adb` must be on PATH for USB mode.
