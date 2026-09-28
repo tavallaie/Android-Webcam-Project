@@ -35,8 +35,7 @@ function Installer() {
   };
 
   const startAutoInstall = async () => {
-    await invoke("init_installer"); 
-    con
+    await invoke("init_installer");
   };
 
   useEffect(() => {

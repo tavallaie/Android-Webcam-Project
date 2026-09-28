@@ -24,7 +24,15 @@ const REQUIRED_FILES: &[&str] = &[
 #[tauri::command]
 pub async fn init_installer(handle: AppHandle) {
     println!("Installer code on Rust initiated!");
- 
+
+    // MSVC and softcam are Windows-only. Linux uses v4l2loopback.
+    if OS != "windows" {
+        report(&handle, "Windows driver setup skipped on this OS.", 100);
+        report(&handle, "Exiting...", 100);
+        let _ = handle.emit("close-installer", true);
+        return;
+    }
+
     //step - 1:
 
     let (ok, missing) = check_required_files(&handle);
@@ -146,21 +154,12 @@ fn check_required_files(handle: &AppHandle) -> (bool, Vec<String>) {
 }
 
 //step - 2 : checking MSVC
-async fn check_msvc(handle: &AppHandle) -> bool {
-    if OS != "win32" {
-        println!("OK");
-        println!("OS: {}", OS)
-    } else {
-        println!("WIN32 NOT SUPPORTED");
-        report(
-            &handle,
-            &format! {"Win32 not supported. Exiting installer..."},
-            10,
-        );
-        return false;
+async fn check_msvc(_handle: &AppHandle) -> bool {
+    if OS != "windows" {
+        return true;
     }
 
-    let output = Command::new("reg")
+    let output = match Command::new("reg")
         .args([
             "query",
             r"HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
@@ -168,7 +167,10 @@ async fn check_msvc(handle: &AppHandle) -> bool {
             "Version",
         ])
         .output()
-        .unwrap();
+    {
+        Ok(output) => output,
+        Err(_) => return false,
+    };
     let formated = String::from_utf8_lossy(&output.stdout);
     println!("{:?}", formated.split_whitespace());
     if let Some(version) = formated.split_whitespace().find(|s| s.starts_with('v')) {
