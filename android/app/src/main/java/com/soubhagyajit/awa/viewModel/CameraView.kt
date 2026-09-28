@@ -88,7 +88,7 @@ class CameraViewModel : ViewModel() {
     private val _isPreviewActive = mutableStateOf(false)
     val isPreviewActive: State<Boolean> = _isPreviewActive
 
-    private val _isServerRunning = mutableStateOf(true)
+    private val _isServerRunning = mutableStateOf(false)
     val isServerRunning: State<Boolean> = _isServerRunning
 
     private val _showLocalPreview = mutableStateOf(false)
@@ -115,6 +115,12 @@ class CameraViewModel : ViewModel() {
 
     fun initialize(context: Context) {
         appContext = context.applicationContext
+
+        VideoStreamServer.onServerStateChanged = { running ->
+            viewModelScope.launch(Dispatchers.Main) {
+                _isServerRunning.value = running
+            }
+        }
 
         // 1. Viewer Connection Callbacks
         VideoStreamServer.onUserConnected = {

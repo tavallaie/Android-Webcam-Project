@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.net.ServerSocket
 import java.io.OutputStream
 
 object VideoStreamServer {
@@ -92,6 +93,12 @@ object VideoStreamServer {
 
     fun start(port: Int = 8080) {
         if (server != null) return
+
+        if (!isPortAvailable(port)) {
+            Log.e("AWA", "Cannot start HTTP server: port $port is already in use")
+            onServerStateChanged?.invoke(false)
+            return
+        }
 
         server = embeddedServer(CIO, port = port) {
             install(ContentNegotiation) {
@@ -206,6 +213,15 @@ object VideoStreamServer {
 
             }
         }.start(wait = false)
+    }
+
+    private fun isPortAvailable(port: Int): Boolean {
+        return try {
+            ServerSocket(port).use { true }
+        } catch (e: Exception) {
+            Log.e("AWA", "Port check failed for $port", e)
+            false
+        }
     }
 
     private suspend fun streamMjpeg(outputStream: OutputStream) {
