@@ -1,13 +1,13 @@
 // vc_linux.rs — Pure virtual camera sink for Linux (v4l2loopback)
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use v4l::video::Output;
-use v4l::{Device, FourCC, Format};
+use v4l::{Device, Format, FourCC};
 use zune_jpeg::JpegDecoder;
 
 pub const CARD_LABEL: &str = "AWC Virtual Cam";
@@ -45,7 +45,15 @@ pub fn loopback_device_path() -> Option<PathBuf> {
 }
 
 static CAM_RUNNING: AtomicBool = AtomicBool::new(false);
+static FRAME_ROTATION: AtomicUsize = AtomicUsize::new(0);
+static FRAME_MIRROR: AtomicBool = AtomicBool::new(false);
 static CAM_THREAD: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
+
+#[tauri::command]
+pub fn set_frame_transform(rotation: u16, mirror: bool) {
+    FRAME_ROTATION.store((rotation as usize) % 360, Ordering::Relaxed);
+    FRAME_MIRROR.store(mirror, Ordering::Relaxed);
+}
 
 /// Frames pushed directly from sender.rs
 pub enum IncomingFrame {
@@ -68,11 +76,73 @@ fn decode_to_rgb(jpeg_bytes: &[u8], width: u32, height: u32, out: &mut [u8]) -> 
     let Some((dec_w, dec_h)) = decoder.dimensions() else {
         return false;
     };
-    if dec_w as u32 != width || dec_h as u32 != height {
-        return false;
+    let source_width = dec_w as usize;
+    let source_height = dec_h as usize;
+    let target_width = width as usize;
+    let target_height = height as usize;
+    let scale = (target_width as f32 / source_width as f32)
+        .max(target_height as f32 / source_height as f32);
+    let displayed_width = source_width as f32 * scale;
+    let displayed_height = source_height as f32 * scale;
+    for y in 0..target_height {
+        for x in 0..target_width {
+            let sx = (((x as f32 + 0.5 - (target_width as f32 - displayed_width) / 2.0) / scale)
+                .floor() as isize)
+                .clamp(0, source_width as isize - 1) as usize;
+            let sy = (((y as f32 + 0.5 - (target_height as f32 - displayed_height) / 2.0) / scale)
+                .floor() as isize)
+                .clamp(0, source_height as isize - 1) as usize;
+            let source_index = (sy * source_width + sx) * 3;
+            let target_index = (y * target_width + x) * 3;
+            out[target_index..target_index + 3]
+                .copy_from_slice(&pixels[source_index..source_index + 3]);
+        }
     }
-    out.copy_from_slice(&pixels);
     true
+}
+
+fn transform_rgb(source: &[u8], output: &mut [u8], width: u32, height: u32) {
+    let width = width as usize;
+    let height = height as usize;
+    let rotation = FRAME_ROTATION.load(Ordering::Relaxed);
+    let mirror = FRAME_MIRROR.load(Ordering::Relaxed);
+    let rotated_width = if rotation == 90 || rotation == 270 {
+        height
+    } else {
+        width
+    };
+    let rotated_height = if rotation == 90 || rotation == 270 {
+        width
+    } else {
+        height
+    };
+    let scale = (width as f32 / rotated_width as f32).max(height as f32 / rotated_height as f32);
+    let displayed_width = rotated_width as f32 * scale;
+    let displayed_height = rotated_height as f32 * scale;
+
+    for y in 0..height {
+        for x in 0..width {
+            let mut rx = (((x as f32 + 0.5 - (width as f32 - displayed_width) / 2.0) / scale)
+                .floor() as isize)
+                .clamp(0, rotated_width as isize - 1) as usize;
+            let ry = (((y as f32 + 0.5 - (height as f32 - displayed_height) / 2.0) / scale).floor()
+                as isize)
+                .clamp(0, rotated_height as isize - 1) as usize;
+            if mirror {
+                rx = rotated_width - 1 - rx;
+            }
+            let (sx, sy) = match rotation {
+                90 => (ry, height - 1 - rx),
+                180 => (width - 1 - rx, height - 1 - ry),
+                270 => (width - 1 - ry, rx),
+                _ => (rx, ry),
+            };
+            let source_index = (sy * width + sx) * 3;
+            let output_index = (y * width + x) * 3;
+            output[output_index..output_index + 3]
+                .copy_from_slice(&source[source_index..source_index + 3]);
+        }
+    }
 }
 
 #[tauri::command]
@@ -163,8 +233,8 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
     };
 
     // YUYV is what browsers and conferencing apps list as a capture camera.
-    let mut fmt = Output::format(&dev)
-        .unwrap_or_else(|_| Format::new(v4l_w, height, FourCC::new(b"YUYV")));
+    let mut fmt =
+        Output::format(&dev).unwrap_or_else(|_| Format::new(v4l_w, height, FourCC::new(b"YUYV")));
     fmt.width = v4l_w;
     fmt.height = height;
     fmt.fourcc = FourCC::new(b"YUYV");
@@ -184,6 +254,7 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
     };
     println!("Linux vcam format in use:\n{}", fmt);
 
+    let mut source_rgb = vec![0u8; (width * height * 3) as usize];
     let mut rgb_frame = vec![0u8; (width * height * 3) as usize];
     let mut yuyv_frame = vec![0u8; (v4l_w * height * 2) as usize];
     for chunk in yuyv_frame.chunks_exact_mut(4) {
@@ -208,16 +279,17 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
         if let Some(frame) = LATEST_FRAME.lock().unwrap().take() {
             match frame {
                 IncomingFrame::Jpeg(jpeg_bytes) => {
-                    if decode_to_rgb(&jpeg_bytes, width, height, &mut rgb_frame) {
+                    if decode_to_rgb(&jpeg_bytes, width, height, &mut source_rgb) {
+                        transform_rgb(&source_rgb, &mut rgb_frame, width, height);
                         rgb_to_yuyv(&rgb_frame, &mut yuyv_frame, v4l_w, height);
                     }
                 }
                 IncomingFrame::RawBgr(mut bgr_bytes) => {
-                    if bgr_bytes.len() == rgb_frame.len() {
+                    if bgr_bytes.len() == source_rgb.len() {
                         for chunk in bgr_bytes.chunks_exact_mut(3) {
                             chunk.swap(0, 2);
                         }
-                        rgb_frame.copy_from_slice(&bgr_bytes);
+                        transform_rgb(&bgr_bytes, &mut rgb_frame, width, height);
                         rgb_to_yuyv(&rgb_frame, &mut yuyv_frame, v4l_w, height);
                     }
                 }

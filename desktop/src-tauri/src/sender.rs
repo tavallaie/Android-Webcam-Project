@@ -1,20 +1,21 @@
 // sender.rs — middleman between the phone stream and vc.rs / UI preview.
 
-use crate::vc::{push_frame, IncomingFrame};
-use base64::engine::general_purpose;
+use crate::vc::{IncomingFrame, push_frame};
 use base64::Engine as _;
+use base64::engine::general_purpose;
 use ffmpeg_next as ff;
 use ffmpeg_sys_next as ffi;
 use image::{ImageFormat, RgbImage};
 use serde::Deserialize;
 use std::io::{Cursor, Read};
 use std::ptr;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{SyncSender, sync_channel};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
+use tungstenite::{Message, connect};
 
 static SENDER_RUNNING: AtomicBool = AtomicBool::new(false);
 static SENDER_THREAD: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
@@ -48,7 +49,10 @@ fn spawn_ui_encoder(app: AppHandle) -> SyncSender<UiFrame> {
 
             if let Some(img_buffer) = RgbImage::from_raw(frame.width, frame.height, rgb_bytes) {
                 let mut jpeg_bytes = Cursor::new(Vec::new());
-                if img_buffer.write_to(&mut jpeg_bytes, ImageFormat::Jpeg).is_ok() {
+                if img_buffer
+                    .write_to(&mut jpeg_bytes, ImageFormat::Jpeg)
+                    .is_ok()
+                {
                     let b64 = general_purpose::STANDARD.encode(jpeg_bytes.into_inner());
                     let _ = app.emit("frame-update", b64);
                     last_emit = Instant::now();
@@ -63,7 +67,10 @@ fn spawn_ui_encoder(app: AppHandle) -> SyncSender<UiFrame> {
 #[tauri::command]
 pub fn set_hw_decode_enabled(enabled: bool) {
     HW_DECODE_ENABLED.store(enabled, Ordering::Relaxed);
-    println!("sender: hardware decode {}", if enabled { "enabled" } else { "disabled" });
+    println!(
+        "sender: hardware decode {}",
+        if enabled { "enabled" } else { "disabled" }
+    );
 }
 
 #[derive(Clone, Copy, PartialEq, Debug, Deserialize)]
@@ -71,6 +78,7 @@ pub fn set_hw_decode_enabled(enabled: bool) {
 pub enum StreamSource {
     Mjpeg,
     Rtsp,
+    Websocket,
 }
 
 #[tauri::command]
@@ -85,14 +93,70 @@ pub fn start_sender(app: AppHandle, source: StreamSource, url: String) {
     let handle = thread::spawn(move || match source {
         StreamSource::Mjpeg => run_mjpeg(app, url),
         StreamSource::Rtsp => run_rtsp(app, url),
+        StreamSource::Websocket => run_websocket(app, url),
     });
     *SENDER_THREAD.lock().unwrap() = Some(handle);
+}
+
+// --- WebSocket JPEG path ---
+
+fn run_websocket(app: AppHandle, url: String) {
+    println!("sender: connecting to WebSocket at {url}");
+
+    let (mut socket, _) = match connect(url.as_str()) {
+        Ok(connection) => connection,
+        Err(error) => {
+            println!("sender: failed to connect to WebSocket: {error}");
+            SENDER_RUNNING.store(false, Ordering::Relaxed);
+            let _ = app.emit("sender-stopped", "Failed to connect to WebSocket source");
+            return;
+        }
+    };
+
+    let ui_tx = spawn_ui_encoder(app.clone());
+
+    while SENDER_RUNNING.load(Ordering::Relaxed) {
+        match socket.read() {
+            Ok(Message::Binary(jpeg)) => {
+                push_frame(IncomingFrame::Jpeg(jpeg.to_vec()));
+
+                let Some(image) = image::load_from_memory(&jpeg)
+                    .ok()
+                    .map(|image| image.to_rgb8())
+                else {
+                    continue;
+                };
+                let (width, height) = image.dimensions();
+                let mut bgr_data = image.into_raw();
+                for chunk in bgr_data.chunks_exact_mut(3) {
+                    chunk.swap(0, 2);
+                }
+                let _ = ui_tx.try_send(UiFrame {
+                    bgr_data,
+                    width,
+                    height,
+                });
+            }
+            Ok(Message::Ping(payload)) => {
+                let _ = socket.send(Message::Pong(payload));
+            }
+            Ok(Message::Close(_)) => break,
+            Ok(_) => {}
+            Err(error) => {
+                println!("sender: WebSocket stream ended: {error}");
+                let _ = app.emit("sender-stopped", "WebSocket stream ended");
+                break;
+            }
+        }
+    }
+
+    SENDER_RUNNING.store(false, Ordering::Relaxed);
 }
 
 #[tauri::command]
 pub fn stop_sender() {
     SENDER_RUNNING.store(false, Ordering::Relaxed);
-    
+
     // FIX 1: Offload thread join to background worker so Tauri's main UI thread never blocks
     thread::spawn(|| {
         if let Some(handle) = SENDER_THREAD.lock().unwrap().take() {
@@ -154,7 +218,7 @@ fn read_next_jpeg(
 
 fn run_mjpeg(app: AppHandle, url: String) {
     println!("sender: connecting to MJPEG at {url}");
-    
+
     // Live MJPEG lasts longer than a few seconds. A 3s total/read timeout
     // aborted the body and looked like a disconnect.
     let client = match reqwest::blocking::Client::builder()
@@ -270,9 +334,9 @@ fn open_rtsp_stream(
     hwaccel_type: ffi::AVHWDeviceType,
 ) -> Result<(ff::format::context::Input, usize, ff::decoder::Video), ff::Error> {
     let mut opts = ff::Dictionary::new();
-    
+
     opts.set("rtsp_transport", "tcp");
-    
+
     // FIX 3: 3-second socket timeout (in microseconds) so FFmpeg breaks out on drop
     opts.set("stimeout", "15000000");
 
@@ -285,8 +349,7 @@ fn open_rtsp_stream(
     let video_stream_index = video_stream.index();
     let codec_params = video_stream.parameters();
 
-    let decoder_codec =
-        ff::decoder::find(codec_params.id()).expect("no H.264 decoder available");
+    let decoder_codec = ff::decoder::find(codec_params.id()).expect("no H.264 decoder available");
 
     let context = ff::codec::context::Context::from_parameters(codec_params)?;
     let mut decoder = context.decoder().video()?;
@@ -321,7 +384,10 @@ fn run_rtsp(app: AppHandle, url: String) {
                 }
             };
 
-        println!("sender: RTSP decode running ({})", if use_hw { "hardware" } else { "software" });
+        println!(
+            "sender: RTSP decode running ({})",
+            if use_hw { "hardware" } else { "software" }
+        );
 
         for (stream, packet) in ictx.packets() {
             if !SENDER_RUNNING.load(Ordering::Relaxed) {
@@ -333,7 +399,9 @@ fn run_rtsp(app: AppHandle, url: String) {
 
             if decoder.send_packet(&packet).is_err() {
                 if use_hw {
-                    println!("sender: hardware decode rejected this stream — falling back to software");
+                    println!(
+                        "sender: hardware decode rejected this stream — falling back to software"
+                    );
                     HW_DECODE_FAILED_THIS_SESSION.store(true, Ordering::Relaxed);
                     use_hw = false;
                     sws_ctx = None;

@@ -300,7 +300,7 @@ private fun CameraContent(camView: CameraViewModel) {
                 if (isServerRunning)
 
                     Box (modifier = Modifier, contentAlignment = Alignment.Center){
-                        Text("IP : ${ipAddress}:${ if (streamMode == CameraViewModel.StreamMode.H264_RTSP) 8554 else 8080 }",modifier = Modifier.padding(4.dp))
+                        Text("IP : ${ipAddress}:${ if (streamMode == CameraViewModel.StreamMode.H264_RTSP) 8554 else 4848 }",modifier = Modifier.padding(4.dp))
                     }
                 if (isServerRunning)
                     Icon(Icons.Default.Link, contentDescription = "Server Status", tint = Color.Green,modifier = Modifier.padding(horizontal = 2.dp))
@@ -418,6 +418,10 @@ fun SettingsPanel(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    OrientationControls(camView = camView, settings = settings)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     if (streamMode == CameraViewModel.StreamMode.MJPEG) {
                         Text("Quality: ${sliderPosition.toInt()}", color = Color.White)
                         Spacer(modifier = Modifier.height(16.dp))
@@ -456,6 +460,35 @@ fun SettingsPanel(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun OrientationControls(camView: CameraViewModel, settings: CameraViewModel.CameraSettings) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Orientation", color = Color.White)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextButton(onClick = { camView.setRotation(settings.rotation + 270) }) {
+                Text("↶ Left")
+            }
+            TextButton(onClick = { camView.setRotation(settings.rotation + 90) }) {
+                Text("↷ Right")
+            }
+            TextButton(onClick = { camView.setRotation(settings.rotation + 180) }) {
+                Text("180°")
+            }
+            TextButton(onClick = { camView.setMirror(!settings.mirror) }) {
+                Text(if (settings.mirror) "Mirrored" else "Mirror")
+            }
+        }
+        Text(
+            "Rotation: ${settings.rotation}°",
+            color = Color.LightGray,
+            fontSize = 12.sp
+        )
     }
 }
 

@@ -56,6 +56,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json")
     implementation("io.ktor:ktor-server-cors:3.5.1")
+    implementation("io.ktor:ktor-server-websockets:3.5.1")
 
     implementation("com.github.pedroSG94.RootEncoder:library:2.7.5")
     implementation("com.github.pedroSG94:RTSP-Server:1.4.1")

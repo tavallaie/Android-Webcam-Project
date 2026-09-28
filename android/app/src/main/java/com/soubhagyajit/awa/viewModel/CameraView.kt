@@ -77,11 +77,17 @@ class CameraViewModel : ViewModel() {
         val isFlashEnabled: Boolean = false,
         val zoom: Float = 1.0f,
         val rotation: Int = 0,
+        val mirror: Boolean = false,
     )
 
     @Volatile
     var currentFrame: ByteArray? = null
         private set
+
+    @Volatile
+    private var outputRotation: Int = 0
+    @Volatile
+    private var outputMirror: Boolean = false
 
     private var mjpegCamera: androidx.camera.core.Camera? = null
     private var rtspCamera: RtspServerCamera2? = null
@@ -157,12 +163,14 @@ class CameraViewModel : ViewModel() {
                 exposure_lower = s.exposureRange.first,
                 exposure_upper = s.exposureRange.last,
                 stream_protocol = currentMode,
-                server_port = 8080, // TODO - Give users option to modify it
+                websocket_available = currentMode == StreamMode.MJPEG,
+                server_port = VideoStreamServer.HTTP_PORT,
                 zoom_max = 1.0f,
                 zoom_min = 1.0f,
                 has_zoom = false, // TODO - Add zoom support
                 rtsp_port = if (currentMode == StreamMode.H264_RTSP) rtspPort else null,
-                rotation = s.rotation
+                rotation = s.rotation,
+                mirror = s.mirror
             )
         }
 
@@ -180,6 +188,7 @@ class CameraViewModel : ViewModel() {
                 stream_quality = s.jpegQuality,
                 has_flash_unit = s.hasFlashUnit,
                 rotation = s.rotation,
+                mirror = s.mirror,
             )
         }
 
@@ -240,12 +249,13 @@ class CameraViewModel : ViewModel() {
                         _settings.value = _settings.value.copy(jpegQuality = value)
                     }
                     update.rotation?.let { setRotation(it) }
+                    update.mirror?.let { setMirror(it) }
                 }
                 null
             }
         }
 
-        VideoStreamServer.start(8080)
+        VideoStreamServer.start(VideoStreamServer.HTTP_PORT)
     }
 
     // --- Unified start/stop ---
@@ -396,6 +406,8 @@ class CameraViewModel : ViewModel() {
         Log.d("AWA", "RTSP prepareVideo=$videoOk prepareAudio=$audioOk")
 
         if (videoOk) {
+            camera.glInterface.setStreamRotation(outputRotation)
+            camera.glInterface.setIsStreamHorizontalFlip(outputMirror)
             val flashAvailable = camera.cameraCharacteristics
                 .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) ?: false
             _settings.value = _settings.value.copy(hasFlashUnit = flashAvailable)
@@ -481,7 +493,8 @@ class CameraViewModel : ViewModel() {
                                     yuvImage.compressToJpeg(Rect(0, 0, width, height), _settings.value.jpegQuality, out)
                                     val jpegBytes = rotateJpeg(
                                         out.toByteArray(),
-                                        imageProxy.imageInfo.rotationDegrees + _settings.value.rotation
+                                        imageProxy.imageInfo.rotationDegrees + outputRotation,
+                                        outputMirror
                                     )
                                     currentFrame = jpegBytes
                                     VideoStreamServer.latestFrame = jpegBytes
@@ -526,12 +539,13 @@ class CameraViewModel : ViewModel() {
         VideoStreamServer.latestFrame = null
     }
 
-    private fun rotateJpeg(jpeg: ByteArray, degrees: Int): ByteArray {
+    private fun rotateJpeg(jpeg: ByteArray, degrees: Int, mirror: Boolean): ByteArray {
         val normalized = ((degrees % 360) + 360) % 360
-        if (normalized == 0) return jpeg
+        if (normalized == 0 && !mirror) return jpeg
 
         val source = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size) ?: return jpeg
         val matrix = Matrix().apply { postRotate(normalized.toFloat()) }
+        if (mirror) matrix.postScale(-1f, 1f)
         val rotated = Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
         val output = ByteArrayOutputStream()
         rotated.compress(Bitmap.CompressFormat.JPEG, _settings.value.jpegQuality, output)
@@ -542,7 +556,17 @@ class CameraViewModel : ViewModel() {
 
     fun setRotation(degrees: Int) {
         val normalized = ((degrees % 360) + 360) % 360
+        outputRotation = normalized
         _settings.value = _settings.value.copy(rotation = normalized)
+        Log.d("AWA", "Output rotation set to $normalized")
+        rtspCamera?.glInterface?.setStreamRotation(normalized)
+    }
+
+    fun setMirror(enabled: Boolean) {
+        outputMirror = enabled
+        _settings.value = _settings.value.copy(mirror = enabled)
+        Log.d("AWA", "Output mirror set to $enabled")
+        rtspCamera?.glInterface?.setIsStreamHorizontalFlip(enabled)
     }
 
     private fun imageProxyToNv21(image: androidx.camera.core.ImageProxy): ByteArray {

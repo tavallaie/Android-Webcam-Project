@@ -15,7 +15,8 @@ function Home() {
   const [phoneIP, setPhoneIP] = useState("");
 
   const [streamProtocol, setStreamProtocol] = useState("mjpeg");
-  const [httpPort, setHttpPort] = useState("8080");
+  const [streamPreference, setStreamPreference] = useState("auto");
+  const [httpPort, setHttpPort] = useState("4848");
   const [rtspPort, setRtspPort] = useState("8554");
   const [serverURL, setServerURL] = useState("");
   const [syncInterval, setSyncInterval] = useState(3000);
@@ -41,6 +42,7 @@ function Home() {
   //devices
   const [devices, setDevices] = useState([]);
   const [devicesLoading, setDevicesLoading] = useState(false);
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
   // settings
   const [deviceFeatures, setDeviceFeatures] = useState(null);
   const [deviceSettings, setDeviceSettings] = useState({
@@ -56,6 +58,8 @@ function Home() {
 
   const [virtualCamActive, setVirtualCamActive] = useState(false);
   const [streamData, setStreamData] = useState({ width: 720, height: 1280 });
+  const [clientRotation, setClientRotation] = useState(0);
+  const [clientMirror, setClientMirror] = useState(false);
 
   const mjpegUrl = phoneIP.trim()
     ? `http://${phoneIP.trim()}:${httpPort}/video`
@@ -63,8 +67,21 @@ function Home() {
   const rtspUrl = phoneIP.trim()
     ? `rtsp://${phoneIP.trim()}:${rtspPort}`
     : "";
-  const activeStreamUrl = streamProtocol === "rtsp" ? rtspUrl : mjpegUrl;
-  const activeStreamLabel = streamProtocol === "rtsp" ? "RTSP" : "MJPEG";
+  const websocketUrl = phoneIP.trim()
+    ? `ws://${phoneIP.trim()}:${httpPort}/stream`
+    : "";
+  const activeStreamUrl =
+    streamProtocol === "rtsp"
+      ? rtspUrl
+      : streamProtocol === "websocket"
+        ? websocketUrl
+        : mjpegUrl;
+  const activeStreamLabel =
+    streamProtocol === "rtsp"
+      ? "RTSP"
+      : streamProtocol === "websocket"
+        ? "WebSocket"
+        : "MJPEG";
 
   const [showControls, setShowControls] = useState(false);
   const [resolutions, setResolutions] = useState([]);
@@ -124,11 +141,12 @@ function Home() {
   useEffect(() => {
     if (mode === "usb") {
       setPhoneIP("127.0.0.1");
-      setHttpPort("8080");
+      setHttpPort("4848");
       handleGetDevices();
     } else if (mode === "wifi") {
       setPhoneIP("");
-      setHttpPort("8080");
+      setHttpPort("4848");
+      discoverPhones();
     }
   }, [mode]);
 
@@ -152,6 +170,14 @@ function Home() {
   useEffect(() => {
     handleResolution();
   }, [deviceSettings.resolution_str]);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    sendControl(
+      `rotation=${clientRotation}&mirror=${clientMirror}`,
+      "Orientation updated",
+    );
+  }, [clientRotation, clientMirror, isConnected]);
 
   useEffect(() => {
     const applyResolutionChange = async () => {
@@ -181,6 +207,25 @@ function Home() {
       setDevices([]);
     }
     setDevicesLoading(false);
+  };
+
+  const discoverPhones = async () => {
+    setDiscoveryLoading(true);
+    try {
+      const found = await invoke("discover_devices");
+      if (found.length > 0) {
+        setPhoneIP(found[0].address);
+        setHttpPort(String(found[0].port || 4848));
+        showToast(`Found AWC phone at ${found[0].address}`, false);
+      } else {
+        showToast("No AWC phone found on this network", true);
+      }
+    } catch (err) {
+      console.error("Phone discovery failed:", err);
+      showToast("Phone discovery failed", true);
+    } finally {
+      setDiscoveryLoading(false);
+    }
   };
 
   const handleDeviceSelect = async (e) => {
@@ -295,6 +340,8 @@ function Home() {
         throw new Error(`Phone HTTP ${response.status} at ${phoneIP}:${httpPort}`);
       }
       const features = await response.json();
+      setClientRotation(Number(features.rotation || 0));
+      setClientMirror(features.mirror === true);
       const actualHttpPort = String(features.server_port || httpPort);
       setHttpPort(actualHttpPort);
 
@@ -303,11 +350,19 @@ function Home() {
       const isRtsp =
         features.stream_protocol && features.stream_protocol.includes("RTSP");
 
-      if (isRtsp) {
+      if (streamPreference === "websocket") {
+        if (!features.websocket_available || isRtsp) {
+          throw new Error("WebSocket requires MJPEG mode on the phone.");
+        }
+        protocol = "websocket";
+        targetUrl = `ws://${phoneIP}:${actualHttpPort}/stream`;
+      } else if (streamPreference === "rtsp" || (streamPreference === "auto" && isRtsp)) {
         protocol = "rtsp";
         const port = features.rtsp_port || rtspPort;
         setRtspPort(port);
         targetUrl = `rtsp://${phoneIP}:${port}`;
+      } else if (streamPreference === "mjpeg" && isRtsp) {
+        throw new Error("MJPEG requires MJPEG mode on the phone.");
       }
       setStreamProtocol(protocol);
 
@@ -419,6 +474,8 @@ function Home() {
       const settings = await response.json();
       setDeviceSettings(settings);
       setCamera(settings.camera);
+      setClientRotation(Number(settings.rotation || 0));
+      setClientMirror(settings.mirror === true);
     } catch (err) {
       console.error("Failed to fetch settings:", err);
     }
@@ -490,14 +547,18 @@ function Home() {
   };
 
   const handleRotate = () => {
-    const nextRotation = (Number(deviceSettings.rotation || 0) + 90) % 360;
-    sendControl(
-      `rotation=${nextRotation}`,
-      `Rotation: ${nextRotation}°`,
-      "rotation",
-      nextRotation,
-    );
-    setDeviceSettings((current) => ({ ...current, rotation: nextRotation }));
+    setClientRotation((current) => (current + 90) % 360);
+    showToast("Rotated right", false);
+  };
+
+  const rotateLeft = () => {
+    setClientRotation((current) => (current + 270) % 360);
+    showToast("Rotated left", false);
+  };
+
+  const rotate180 = () => {
+    setClientRotation((current) => (current + 180) % 360);
+    showToast("Rotated 180°", false);
   };
 
   const handleFlash = () => {
@@ -647,10 +708,32 @@ function Home() {
                   aria-label="Phone HTTP port"
                   className="field-control w-20"
                 />
+                <button
+                  type="button"
+                  onClick={discoverPhones}
+                  disabled={discoveryLoading || isConnected}
+                  className="field-control w-24 text-[10px] disabled:opacity-50"
+                >
+                  {discoveryLoading ? "Finding…" : "Discover"}
+                </button>
               </div>
-              <p className="text-[10px] text-slate-500">
-                Stream protocol is detected from the phone after connection.
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] text-slate-500">
+                  Choose how AWC receives the camera feed.
+                </p>
+                <select
+                  value={streamPreference}
+                  onChange={(e) => setStreamPreference(e.target.value)}
+                  disabled={isConnected}
+                  className="field-control w-32 py-1 text-[10px]"
+                  aria-label="Stream transport"
+                >
+                  <option value="auto">Phone default</option>
+                  <option value="websocket">WebSocket</option>
+                  <option value="mjpeg">MJPEG</option>
+                  <option value="rtsp">RTSP</option>
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
@@ -706,11 +789,30 @@ function Home() {
                   {isFlashOn ? "Turn off Flash" : "Turn on Flash"}
                 </button>
                 <button
-                  onClick={handleRotate}
-                  disabled={streamProtocol !== "mjpeg"}
-                  className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={rotateLeft}
+                  className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-1.5 rounded-lg text-xs transition-all"
+                  title="Rotate left 90°"
                 >
-                  Rotate 90°
+                  ↶ Left
+                </button>
+                <button
+                  onClick={handleRotate}
+                  className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-1.5 rounded-lg text-xs transition-all"
+                  title="Rotate right 90°"
+                >
+                  ↷ Right
+                </button>
+                <button
+                  onClick={rotate180}
+                  className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-1.5 rounded-lg text-xs transition-all"
+                >
+                  180°
+                </button>
+                <button
+                  onClick={() => setClientMirror((current) => !current)}
+                  className={`w-full border ${clientMirror ? "border-brand-500 bg-brand-500/10 text-brand-300" : "border-slate-700 text-slate-300"} hover:border-brand-500/50 hover:bg-brand-500/10 py-1.5 rounded-lg text-xs transition-all`}
+                >
+                  {clientMirror ? "Mirrored" : "Mirror"}
                 </button>
               </div>
 
@@ -878,8 +980,9 @@ function Home() {
                   OBS / direct stream
                 </label>
                 <p className="mt-1 text-[10px] leading-snug text-slate-500">
-                  Use these URLs if the virtual camera is unavailable. In OBS,
-                  add a Media Source and paste the matching URL.
+                  {streamProtocol === "websocket"
+                    ? "WebSocket is used by the AWC desktop client. Use MJPEG or RTSP when adding the stream directly to OBS."
+                    : "Use this URL if the virtual camera is unavailable. In OBS, add a Media Source and paste it."}
                 </p>
               </div>
 
@@ -965,7 +1068,9 @@ function Home() {
               id="videoStreamDiv"
               className={`${isConnected ? "block" : "hidden"} relative w-full h-full flex items-center justify-center`}
             >
-              <Preview isConnected={isConnected} />
+              <Preview
+                isConnected={isConnected}
+              />
             </div>
           </div>
 

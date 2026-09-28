@@ -58,13 +58,13 @@ If you see "unauthorized", check your phone for permission prompt.
 
 ### 4. Setup Port Forwarding
 
-This forwards the server port (8080) from Phone to PC via USB:
+This forwards the server port (4848) from Phone to PC via USB:
 
 ```bash
-adb forward tcp:8080 tcp:8080
+adb forward tcp:4848 tcp:4848
 ```
 
-This makes `localhost:8080` on your PC connect to `localhost:8080` on your Phone!
+This makes `localhost:4848` on your PC connect to `localhost:4848` on your Phone!
 
 
 ### 6. Start Everything
@@ -133,7 +133,7 @@ adb devices
 adb forward --remove-all
 
 # Setup again
-adb forward tcp:8080 tcp:8080
+adb forward tcp:4848 tcp:4848
 
 # Verify
 adb forward --list
@@ -146,6 +146,6 @@ adb forward --list
 adb devices
 
 # Use specific device
-adb -s ABC123XYZ reverse tcp:8080 tcp:8080
+adb -s ABC123XYZ reverse tcp:4848 tcp:4848
 adb -s ABC123XYZ shell
 ```

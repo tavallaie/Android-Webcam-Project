@@ -25,8 +25,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             installer::init_installer, 
             adb::adb_get_devices, 
+            adb::discover_devices,
             adb::adb_connect_device, 
             vc::init_cam, 
+            vc::set_frame_transform,
             sender::set_hw_decode_enabled, 
             sender::start_sender, 
             sender::stop_sender])

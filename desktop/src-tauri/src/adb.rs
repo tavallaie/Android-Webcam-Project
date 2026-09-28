@@ -6,11 +6,57 @@ use tauri::AppHandle;
 #[cfg(target_os = "windows")]
 use tauri::Manager;
 use tokio::process::Command;
+use std::net::{SocketAddr, UdpSocket};
+use std::time::Duration;
 
 #[derive(Clone, Serialize, Debug)]
 pub struct Device {
     id: String,
     model: String,
+}
+
+#[derive(Clone, Serialize, Debug)]
+pub struct DiscoveredDevice {
+    pub address: String,
+    pub port: u16,
+}
+
+const DISCOVERY_PORT: u16 = 4848;
+const DISCOVERY_REQUEST: &[u8] = b"AWC_DISCOVER\n";
+const DISCOVERY_RESPONSE: &[u8] = b"AWC_DISCOVERY_REPLY";
+
+#[tauri::command]
+pub async fn discover_devices() -> Result<Vec<DiscoveredDevice>, String> {
+    tokio::task::spawn_blocking(|| {
+        let socket = UdpSocket::bind("0.0.0.0:0")
+            .map_err(|e| format!("Could not open discovery socket: {e}"))?;
+        socket
+            .set_broadcast(true)
+            .map_err(|e| format!("Could not enable broadcast discovery: {e}"))?;
+        socket
+            .send_to(DISCOVERY_REQUEST, ("255.255.255.255", DISCOVERY_PORT))
+            .map_err(|e| format!("Could not broadcast discovery request: {e}"))?;
+        socket
+            .set_read_timeout(Some(Duration::from_millis(1200)))
+            .map_err(|e| format!("Could not configure discovery timeout: {e}"))?;
+
+        let mut found = Vec::new();
+        let mut buffer = [0u8; 256];
+        while let Ok((size, peer)) = socket.recv_from(&mut buffer) {
+            if buffer[..size].starts_with(DISCOVERY_RESPONSE) {
+                let address = match peer {
+                    SocketAddr::V4(addr) => addr.ip().to_string(),
+                    SocketAddr::V6(addr) => addr.ip().to_string(),
+                };
+                if !found.iter().any(|device: &DiscoveredDevice| device.address == address) {
+                    found.push(DiscoveredDevice { address, port: DISCOVERY_PORT });
+                }
+            }
+        }
+        Ok(found)
+    })
+    .await
+    .map_err(|e| format!("Discovery task failed: {e}"))?
 }
 
 pub fn adb_is_available() -> bool {
@@ -115,12 +161,12 @@ pub async fn adb_connect_device(
 
     let adb = adb_bin(&handle);
 
-    // Async execution for 8080 forward
-    let output_8080 = Command::new(&adb)
-        .args(["-s", &device_id, "forward", "tcp:8080", "tcp:8080"])
+    // Forward the fixed AWC control/stream port.
+    let output_4848 = Command::new(&adb)
+        .args(["-s", &device_id, "forward", "tcp:4848", "tcp:4848"])
         .output()
         .await
-        .map_err(|e| format!("Failed to run ADB 8080 forward: {}", e))?;
+        .map_err(|e| format!("Failed to run ADB 4848 forward: {}", e))?;
 
     // Async execution for 8554 forward
     let output_8554 = Command::new(&adb)
@@ -129,14 +175,14 @@ pub async fn adb_connect_device(
         .await
         .map_err(|e| format!("Failed to run ADB 8554 forward: {}", e))?;
 
-    if output_8080.status.success() && output_8554.status.success() {
+    if output_4848.status.success() && output_8554.status.success() {
         Ok(format!("Device {} is ready", device_model))
     } else {
-        let err_8080 = String::from_utf8_lossy(&output_8080.stderr);
+        let err_4848 = String::from_utf8_lossy(&output_4848.stderr);
         let err_8554 = String::from_utf8_lossy(&output_8554.stderr);
         Err(format!(
             "Device {} not ready: {} {}",
-            device_model, err_8080, err_8554
+            device_model, err_4848, err_8554
         ))
     }
 }
@@ -173,9 +219,9 @@ pub async fn adb_disconnect_device(
     };
 
     // Run both port removal commands concurrently with tokio::join!
-    let (res_8080, res_8554) = tokio::join!(remove_port("tcp:8080"), remove_port("tcp:8554"));
+    let (res_4848, res_8554) = tokio::join!(remove_port("tcp:4848"), remove_port("tcp:8554"));
 
-    match (res_8080, res_8554) {
+    match (res_4848, res_8554) {
         (Ok(_), Ok(_)) => Ok(format!("Device {} is disconnected", device_model)),
         (Err(e1), Err(e2)) => Err(format!("Failed to disconnect {}: {}; {}", device_model, e1, e2)),
         (Err(e), _) | (_, Err(e)) => Err(format!("Failed to disconnect {}: {}", device_model, e)),
@@ -195,4 +241,3 @@ fn get_file_path(handle: &AppHandle, file: &str) -> PathBuf {
             .unwrap()
     }
 }
-

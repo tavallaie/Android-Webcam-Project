@@ -157,7 +157,7 @@ pnpm run build:linux
 ### Connection Issues
 
 **"Can't connect -"**
-- Check firewall (allow port 8080 and 8554 - default ports)
+- Check firewall (allow port 4848 and 8554 - default ports)
 - Verify same WiFi network (for WiFi mode)
 - Check USB debugging (for USB mode)
 

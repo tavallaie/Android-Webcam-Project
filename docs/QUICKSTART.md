@@ -50,10 +50,10 @@ cd android && ./gradlew :app:assembleDebug
 
 **Can't connect?**
 ```bash
-# Firewall blocking port 8080? Allow it:
+# Firewall blocking port 4848? Allow it:
 # Windows: Windows Defender Firewall → Allow an app
 # Mac: System Preferences → Security → Firewall Options
-# Linux: sudo ufw allow 8080
+# Linux: sudo ufw allow 4848
 ```
 
 **Android build errors?**
