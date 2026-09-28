@@ -7,10 +7,6 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [react(),tailwindcss()],
 
-  // Tauri production bundles load the frontend from the application bundle,
-  // so assets must use relative URLs instead of the site-root `/assets/...`.
-  base: "./",
-
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
