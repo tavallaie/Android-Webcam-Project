@@ -12,12 +12,12 @@ function Home() {
 
   // connection settings
   const [mode, setMode] = useState("usb");
-  const [phoneIP, setPhoneIP] = useState("localhost");
+  const [phoneIP, setPhoneIP] = useState("");
 
   const [streamProtocol, setStreamProtocol] = useState("mjpeg");
   const [httpPort, setHttpPort] = useState("8080");
   const [rtspPort, setRtspPort] = useState("8554");
-  const [serverURL, setServerURL] = useState(`http://${phoneIP}:${httpPort}`);
+  const [serverURL, setServerURL] = useState("");
   const [syncInterval, setSyncInterval] = useState(3000);
 
   // connection states and indicators
@@ -112,15 +112,12 @@ function Home() {
   }, []);
 
   useEffect(() => {
-    const urlInput = document.getElementById("serverURL");
     if (mode === "usb") {
-      urlInput.classList.replace("flex", "hidden");
       setPhoneIP("127.0.0.1");
       setHttpPort("8080");
       handleGetDevices();
     } else if (mode === "wifi") {
-      urlInput.classList.replace("hidden", "flex");
-      setPhoneIP("192.168.31.12");
+      setPhoneIP("");
       setHttpPort("8080");
     }
   }, [mode]);
@@ -245,6 +242,10 @@ function Home() {
           deviceModel: device.model,
         });
         setDevices(listed);
+      }
+
+      if (mode === "wifi" && !phoneIP.trim()) {
+        throw new Error("Enter your phone's Wi-Fi IP address first.");
       }
 
       const response = await fetchUrl(`http://${phoneIP}:${httpPort}/features`);
@@ -491,11 +492,45 @@ function Home() {
           <hr className="border-slate-800" />
 
           <div className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-300">Connection</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Choose how this computer reaches your phone.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => !isConnected && setMode("usb")}
+                  disabled={isConnected}
+                  className={`mode-card ${mode === "usb" ? "mode-card-active" : ""}`}
+                >
+                  <span className="mode-card-icon">↕</span>
+                  <span className="mode-card-title">USB</span>
+                  <span className="mode-card-detail">Lowest latency</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => !isConnected && setMode("wifi")}
+                  disabled={isConnected}
+                  className={`mode-card ${mode === "wifi" ? "mode-card-active" : ""}`}
+                >
+                  <span className="mode-card-icon">⌁</span>
+                  <span className="mode-card-title">Wi‑Fi</span>
+                  <span className="mode-card-detail">No cable needed</span>
+                </button>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-500">
+                {mode === "usb"
+                  ? "Connect your phone with USB debugging enabled. AWC will forward the stream through ADB."
+                  : "Connect both devices to the same network, then enter the phone's local IP address."}
+              </p>
+
               {mode === "usb" && (
                 <>
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Select Your Device:
+                  <label className="field-label">
+                    USB device
                   </label>
                   <div className="flex gap-2 items-center">
                     <select
@@ -503,7 +538,7 @@ function Home() {
                       onChange={(e) => {
                         handleDeviceSelect(e);
                       }}
-                      className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all"
+                      className="field-control flex-1"
                     >
                       {devices.length > 0 ? (
                         <>
@@ -523,7 +558,7 @@ function Home() {
                         setDevices([]);
                         handleGetDevices();
                       }}
-                      className="text-xs text-brand-400 hover:text-brand-300 bg-slate-800 hover:bg-slate-700 p-2 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      className="icon-control"
                     >
                       <svg
                         className={`w-[1.4rem] h-[1.4rem] p-1 ${devicesLoading ? "animate-spin" : ""}`}
@@ -540,32 +575,14 @@ function Home() {
                   </div>
                 </>
               )}
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Select Mode (USB or WIFI):
-              </label>
-              <select
-                value={mode}
-                onChange={(e) => {
-                  setMode(e.target.value);
-                }}
-                id="connectionMode"
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all"
-              >
-                <option className="bg-white" value="usb">
-                  USB
-                </option>
-                <option className="" value="wifi">
-                  WIFI
-                </option>
-              </select>
-              <div className="gap-2 hidden" id="serverURL">
+              <div className={`${mode === "wifi" ? "flex" : "hidden"} gap-2`} id="serverURL">
                 <input
                   type="text"
                   id="phoneIP"
                   value={phoneIP}
                   onChange={(e) => setPhoneIP(e.target.value)}
-                  placeholder="IP"
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all"
+                  placeholder="Phone IP, e.g. 192.168.1.42"
+                  className="field-control min-w-0 flex-1"
                 />
                 <input
                   type="text"
@@ -577,12 +594,12 @@ function Home() {
                       : (e) => setRtspPort(e.target.value)
                   }
                   placeholder="Port"
-                  className="w-20 bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all"
+                  className="field-control w-20"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Select Stream Mode (MJPEG or RTSP):
+                  <label className="field-label">
+                    Video protocol
                 </label>
                 <select
                   value={streamProtocol}
@@ -590,7 +607,7 @@ function Home() {
                     setStreamProtocol(e.target.value);
                   }}
                   id="streamProtocol"
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all"
+                  className="field-control"
                 >
                   <option className="bg-white" value="mjpeg">
                     MJPEG
@@ -603,8 +620,8 @@ function Home() {
             </div>
 
             <div className="grid grid-cols-1 gap-2">
-              <button
-                onClick={handleToggle}
+                <button
+                  onClick={handleToggle}
                 id="toggleConnectBtn"
                 disabled={connectButtonDisable}
                 className={`w-full ${connectButtonDisable ? "bg-slate-500 hover:bg-slate-600 cursor-not-allowed text-white" : isConnected ? "bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 cursor-pointer" : "bg-brand-500 hover:bg-brand-600 text-white cursor-pointer"} font-semibold py-2.5 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2`}
@@ -861,11 +878,12 @@ function Home() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  Connect Your Stream
+                  {mode === "usb" ? "Connect over USB" : "Connect over Wi‑Fi"}
                 </h2>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  Toggle your phone's webcam server and enter the URL in the
-                  sidebar.
+                  {mode === "usb"
+                    ? "Plug in your phone, choose it in the sidebar, and start the stream."
+                    : "Enter the phone's IP address, then start the stream on both devices."}
                 </p>
               </div>
             </div>

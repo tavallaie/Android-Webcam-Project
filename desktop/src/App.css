@@ -119,8 +119,9 @@ button {
 @import "tailwindcss";
 
 @theme {
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
+  --color-brand-400: #7dd3fc;
+  --color-brand-500: #38bdf8;
+  --color-brand-600: #0284c7;
 }
 ::-webkit-scrollbar {
   width: 6px;
@@ -153,7 +154,39 @@ button {
 }
 
 .glass {
-  @apply bg-slate-900/50 backdrop-blur-xl border border-slate-700/50;
+  @apply bg-slate-900/80 backdrop-blur-xl border border-slate-800;
+}
+
+.field-label {
+  @apply text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500;
+}
+
+.field-control {
+  @apply rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
+}
+
+.icon-control {
+  @apply flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-brand-400 transition-colors hover:border-brand-500 hover:bg-slate-700;
+}
+
+.mode-card {
+  @apply flex cursor-pointer flex-col items-start gap-1 rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-left transition-all hover:border-slate-600 hover:bg-slate-800/70 disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.mode-card-active {
+  @apply border-brand-500/70 bg-brand-500/10 ring-1 ring-brand-500/30;
+}
+
+.mode-card-icon {
+  @apply flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 text-lg text-brand-400;
+}
+
+.mode-card-title {
+  @apply mt-1 text-sm font-semibold text-slate-100;
+}
+
+.mode-card-detail {
+  @apply text-[10px] text-slate-500;
 }
 
 .video-glow {
