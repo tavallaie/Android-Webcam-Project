@@ -89,6 +89,29 @@ function Home() {
   }, []);
 
   useEffect(() => {
+    const unlisten = listen("sender-stopped", (e) => {
+      const message =
+        typeof e.payload === "string" && e.payload
+          ? e.payload
+          : "Stream ended";
+      updateStatus(message, "error");
+      setIsConnected(false);
+      setConnectButtonDisable(false);
+      setConnectButtonText("Connect");
+      setShowControls(false);
+      if (syncSettingsInterval.current || syncFeaturesInterval.current) {
+        clearInterval(syncSettingsInterval.current);
+        clearInterval(syncFeaturesInterval.current);
+        syncSettingsInterval.current = null;
+        syncFeaturesInterval.current = null;
+      }
+    });
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
+
+  useEffect(() => {
     const urlInput = document.getElementById("serverURL");
     if (mode === "usb") {
       urlInput.classList.replace("flex", "hidden");

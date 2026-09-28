@@ -155,15 +155,17 @@ fn read_next_jpeg(
 fn run_mjpeg(app: AppHandle, url: String) {
     println!("sender: connecting to MJPEG at {url}");
     
-    // FIX 2: Add socket read & connection timeouts to MJPEG HTTP client
+    // Live MJPEG lasts longer than a few seconds. A 3s total/read timeout
+    // aborted the body and looked like a disconnect.
     let client = match reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(3))
-        .connect_timeout(Duration::from_secs(3))
-        .build() 
+        .timeout(None)
+        .connect_timeout(Duration::from_secs(5))
+        .build()
     {
         Ok(c) => c,
         Err(_) => {
             SENDER_RUNNING.store(false, Ordering::Relaxed);
+            let _ = app.emit("sender-stopped", "Could not build HTTP client");
             return;
         }
     };
@@ -171,6 +173,7 @@ fn run_mjpeg(app: AppHandle, url: String) {
     let Ok(mut reader) = client.get(&url).send() else {
         println!("sender: failed to connect to MJPEG source");
         SENDER_RUNNING.store(false, Ordering::Relaxed);
+        let _ = app.emit("sender-stopped", "Failed to connect to MJPEG source");
         return;
     };
 
@@ -180,6 +183,10 @@ fn run_mjpeg(app: AppHandle, url: String) {
     while SENDER_RUNNING.load(Ordering::Relaxed) {
         let Some(jpeg) = read_next_jpeg(&mut reader, &mut buffer, &mut chunk) else {
             println!("sender: MJPEG stream ended or errored");
+            let _ = app.emit(
+                "sender-stopped",
+                "Phone stream ended. Keep the phone screen on.",
+            );
             break;
         };
 
@@ -260,7 +267,7 @@ fn open_rtsp_stream(
     opts.set("rtsp_transport", "tcp");
     
     // FIX 3: 3-second socket timeout (in microseconds) so FFmpeg breaks out on drop
-    opts.set("stimeout", "3000000");
+    opts.set("stimeout", "15000000");
 
     let ictx = ff::format::input_with_dictionary(url, opts)?;
 
