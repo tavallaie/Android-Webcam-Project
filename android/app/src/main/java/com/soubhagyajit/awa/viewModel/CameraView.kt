@@ -1,7 +1,10 @@
 package com.soubhagyajit.awa.viewModel
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
+import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.YuvImage
 import android.hardware.camera2.CameraCharacteristics
@@ -73,6 +76,7 @@ class CameraViewModel : ViewModel() {
         val hasFlashUnit: Boolean = false,
         val isFlashEnabled: Boolean = false,
         val zoom: Float = 1.0f,
+        val rotation: Int = 0,
     )
 
     @Volatile
@@ -157,7 +161,8 @@ class CameraViewModel : ViewModel() {
                 zoom_max = 1.0f,
                 zoom_min = 1.0f,
                 has_zoom = false, // TODO - Add zoom support
-                rtsp_port = if (currentMode == StreamMode.H264_RTSP) rtspPort else null
+                rtsp_port = if (currentMode == StreamMode.H264_RTSP) rtspPort else null,
+                rotation = s.rotation
             )
         }
 
@@ -174,6 +179,7 @@ class CameraViewModel : ViewModel() {
                 focus_distance = s.focusDistance*1000,
                 stream_quality = s.jpegQuality,
                 has_flash_unit = s.hasFlashUnit,
+                rotation = s.rotation,
             )
         }
 
@@ -233,6 +239,7 @@ class CameraViewModel : ViewModel() {
                     update.stream_quality?.let{value ->
                         _settings.value = _settings.value.copy(jpegQuality = value)
                     }
+                    update.rotation?.let { setRotation(it) }
                 }
                 null
             }
@@ -472,7 +479,10 @@ class CameraViewModel : ViewModel() {
                                     val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
                                     val out = ByteArrayOutputStream()
                                     yuvImage.compressToJpeg(Rect(0, 0, width, height), _settings.value.jpegQuality, out)
-                                    val jpegBytes = out.toByteArray()
+                                    val jpegBytes = rotateJpeg(
+                                        out.toByteArray(),
+                                        imageProxy.imageInfo.rotationDegrees + _settings.value.rotation
+                                    )
                                     currentFrame = jpegBytes
                                     VideoStreamServer.latestFrame = jpegBytes
                                 } catch (e: Exception) {
@@ -514,6 +524,25 @@ class CameraViewModel : ViewModel() {
         currentFrame = null
         mjpegCamera = null
         VideoStreamServer.latestFrame = null
+    }
+
+    private fun rotateJpeg(jpeg: ByteArray, degrees: Int): ByteArray {
+        val normalized = ((degrees % 360) + 360) % 360
+        if (normalized == 0) return jpeg
+
+        val source = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size) ?: return jpeg
+        val matrix = Matrix().apply { postRotate(normalized.toFloat()) }
+        val rotated = Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+        val output = ByteArrayOutputStream()
+        rotated.compress(Bitmap.CompressFormat.JPEG, _settings.value.jpegQuality, output)
+        if (rotated !== source) rotated.recycle()
+        source.recycle()
+        return output.toByteArray()
+    }
+
+    fun setRotation(degrees: Int) {
+        val normalized = ((degrees % 360) + 360) % 360
+        _settings.value = _settings.value.copy(rotation = normalized)
     }
 
     private fun imageProxyToNv21(image: androidx.camera.core.ImageProxy): ByteArray {

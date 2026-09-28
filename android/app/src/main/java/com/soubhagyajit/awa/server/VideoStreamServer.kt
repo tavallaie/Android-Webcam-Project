@@ -34,7 +34,8 @@ object VideoStreamServer {
         val zoom_min: Float,
         val stream_protocol: CameraViewModel.StreamMode,
         val server_port: Int? = null,
-        val rtsp_port: Int? = null
+        val rtsp_port: Int? = null,
+        val rotation: Int = 0
     )
 
     @Serializable
@@ -49,6 +50,7 @@ object VideoStreamServer {
         val stream_quality: Int,
         val flash: Boolean = false,
         val has_flash_unit: Boolean? = null,
+        val rotation: Int = 0,
     )
 
     @Serializable
@@ -63,6 +65,7 @@ object VideoStreamServer {
         val switchCamera: Boolean? = null,
         val camera: String,
         val stream_quality: Int? = null,
+        val rotation: Int? = null,
     )
 
     var featuresProvider: (() -> FeaturesResponse)? = null
@@ -141,7 +144,8 @@ object VideoStreamServer {
                         zoom_min = 1.0f,
                         stream_protocol = CameraViewModel.StreamMode.MJPEG,
                         server_port = null,
-                        rtsp_port = null
+                        rtsp_port = null,
+                        rotation = 0
                     )
                     call.respond(response)
                 }
@@ -158,6 +162,7 @@ object VideoStreamServer {
                         focus_distance = 0f,
                         has_flash_unit = false,
                         stream_quality = 80,
+                        rotation = 0,
                     )
                     call.respond(response)
                 }
@@ -192,6 +197,7 @@ object VideoStreamServer {
                         focus_distance = params["focus_distance"]?.toFloatOrNull(),
                         switchCamera = if (params.contains("switch_camera")) true else null,
                         stream_quality = 80,
+                        rotation = params["rotation"]?.toIntOrNull(),
                     )
 
                     val error = onSettingsUpdated?.invoke(update)

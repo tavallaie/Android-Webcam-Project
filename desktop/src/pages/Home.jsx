@@ -51,6 +51,7 @@ function Home() {
     stream_quality: 100,
     resolution_str: "1280x720",
     camera: "back",
+    rotation: 0,
   });
 
   const [virtualCamActive, setVirtualCamActive] = useState(false);
@@ -62,6 +63,8 @@ function Home() {
   const rtspUrl = phoneIP.trim()
     ? `rtsp://${phoneIP.trim()}:${rtspPort}`
     : "";
+  const activeStreamUrl = streamProtocol === "rtsp" ? rtspUrl : mjpegUrl;
+  const activeStreamLabel = streamProtocol === "rtsp" ? "RTSP" : "MJPEG";
 
   const [showControls, setShowControls] = useState(false);
   const [resolutions, setResolutions] = useState([]);
@@ -212,12 +215,34 @@ function Home() {
   };
 
   const copyStreamUrl = async (url, label) => {
+    const fallbackCopy = () => {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand("copy");
+      textarea.remove();
+      return copied;
+    };
+
     try {
-      await navigator.clipboard.writeText(url);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else if (!fallbackCopy()) {
+        throw new Error("Clipboard command failed");
+      }
       showToast(`${label} URL copied`, false);
     } catch (err) {
-      console.error("Could not copy stream URL:", err);
-      showToast("Could not copy URL", true);
+      try {
+        if (!fallbackCopy()) throw new Error("Clipboard command failed");
+        showToast(`${label} URL copied`, false);
+      } catch (fallbackError) {
+        console.error("Could not copy stream URL:", fallbackError);
+        showToast("Could not copy URL", true);
+      }
     }
   };
 
@@ -270,9 +295,11 @@ function Home() {
         throw new Error(`Phone HTTP ${response.status} at ${phoneIP}:${httpPort}`);
       }
       const features = await response.json();
+      const actualHttpPort = String(features.server_port || httpPort);
+      setHttpPort(actualHttpPort);
 
       let protocol = "mjpeg";
-      let targetUrl = `http://${phoneIP}:${httpPort}/video`;
+      let targetUrl = `http://${phoneIP}:${actualHttpPort}/video`;
       const isRtsp =
         features.stream_protocol && features.stream_protocol.includes("RTSP");
 
@@ -453,13 +480,24 @@ function Home() {
 
   const handleSwitchCamera = () => {
     const newValue = camera === "back" ? true : false;
-    setCamera(newValue ? "front" : "back");
+      setCamera(newValue ? "front" : "back");
     sendControl(
       `camera=${newValue ? "front" : "back"}`,
       `Camera: ${newValue ? "Front" : "Back"}`,
       "camera",
       newValue,
     );
+  };
+
+  const handleRotate = () => {
+    const nextRotation = (Number(deviceSettings.rotation || 0) + 90) % 360;
+    sendControl(
+      `rotation=${nextRotation}`,
+      `Rotation: ${nextRotation}°`,
+      "rotation",
+      nextRotation,
+    );
+    setDeviceSettings((current) => ({ ...current, rotation: nextRotation }));
   };
 
   const handleFlash = () => {
@@ -603,37 +641,16 @@ function Home() {
                 />
                 <input
                   type="text"
-                  value={streamProtocol === "mjpeg" ? httpPort : rtspPort}
+                  value={httpPort}
                   id="port"
-                  onChange={
-                    streamProtocol === "mjpeg"
-                      ? (e) => setHttpPort(e.target.value)
-                      : (e) => setRtspPort(e.target.value)
-                  }
-                  placeholder="Port"
+                  readOnly
+                  aria-label="Phone HTTP port"
                   className="field-control w-20"
                 />
               </div>
-              <div>
-                  <label className="field-label">
-                    Video protocol
-                </label>
-                <select
-                  value={streamProtocol}
-                  onChange={(e) => {
-                    setStreamProtocol(e.target.value);
-                  }}
-                  id="streamProtocol"
-                  className="field-control w-full"
-                >
-                  <option className="bg-white" value="mjpeg">
-                    MJPEG
-                  </option>
-                  <option className="" value="rtsp">
-                    RTSP
-                  </option>
-                </select>
-              </div>
+              <p className="text-[10px] text-slate-500">
+                Stream protocol is detected from the phone after connection.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
@@ -674,7 +691,7 @@ function Home() {
                   Sync
                 </button>
               </div>
-              <div className="flex">
+              <div className="grid grid-cols-2 gap-1.5">
                 <button
                   onClick={handleSwitchCamera}
                   className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-2"
@@ -687,6 +704,13 @@ function Home() {
                   className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-2"
                 >
                   {isFlashOn ? "Turn off Flash" : "Turn on Flash"}
+                </button>
+                <button
+                  onClick={handleRotate}
+                  disabled={streamProtocol !== "mjpeg"}
+                  className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Rotate 90°
                 </button>
               </div>
 
@@ -861,33 +885,15 @@ function Home() {
 
               <div className="space-y-1.5">
                 <span className="text-[10px] font-semibold text-slate-400">
-                  MJPEG
+                  {activeStreamLabel}
                 </span>
                 <div className="flex items-center gap-1.5">
                   <code className="min-w-0 flex-1 truncate rounded-md border border-slate-700 bg-slate-950/60 px-2 py-1.5 text-[10px] text-slate-300">
-                    {mjpegUrl}
+                    {activeStreamUrl}
                   </code>
                   <button
                     type="button"
-                    onClick={() => copyStreamUrl(mjpegUrl, "MJPEG")}
-                    className="shrink-0 rounded-md border border-slate-700 px-2 py-1.5 text-[10px] text-slate-300 transition-colors hover:border-brand-500/50 hover:text-brand-400"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-semibold text-slate-400">
-                  RTSP
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <code className="min-w-0 flex-1 truncate rounded-md border border-slate-700 bg-slate-950/60 px-2 py-1.5 text-[10px] text-slate-300">
-                    {rtspUrl}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => copyStreamUrl(rtspUrl, "RTSP")}
+                    onClick={() => copyStreamUrl(activeStreamUrl, activeStreamLabel)}
                     className="shrink-0 rounded-md border border-slate-700 px-2 py-1.5 text-[10px] text-slate-300 transition-colors hover:border-brand-500/50 hover:text-brand-400"
                   >
                     Copy
