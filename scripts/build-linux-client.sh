@@ -42,6 +42,7 @@ run_native() {
   clean_stale_rust_target
   pnpm --dir "$CLIENT" install --frozen-lockfile
   pnpm --dir "$CLIENT" tauri build --bundles "$build_bundles"
+  "$ROOT/scripts/isolate-appimage-profile.sh"
 }
 
 run_docker() {
@@ -84,7 +85,7 @@ run_docker() {
     -v "$pnpm_dir":/opt/pnpm \
     -w /work \
     "$IMAGE" \
-    bash -lc "pnpm --dir desktop install --frozen-lockfile --store-dir /tmp/pnpm-store && pnpm --dir desktop tauri build --bundles '$build_bundles'"
+    bash -lc "pnpm --dir desktop install --frozen-lockfile --store-dir /tmp/pnpm-store && pnpm --dir desktop tauri build --bundles '$build_bundles' && bash scripts/isolate-appimage-profile.sh"
 }
 
 bundle_ffmpeg_in_deb() {
