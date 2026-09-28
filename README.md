@@ -76,16 +76,16 @@ The desktop client creates a virtual webcam that works with:
 The virtual webcam should appear automatically in your video apps.
 
 ### Linux Setup
-The desktop client uses `v4l2loopback-dkms` so **AWC Virtual Cam** appears as a system camera in Zoom, Meet, OBS, and other apps.
+The desktop client does not install `adb` or `v4l2loopback`. It checks for them and shows an error if they are missing.
 
-The first-run setup window installs the package (a password prompt may appear). You can also install it yourself:
+Load a loopback device before **Start Virtual Cam**:
 
 ```bash
-sudo apt-get install v4l2loopback-dkms v4l2loopback-utils
+sudo apt-get install v4l2loopback-dkms
 sudo modprobe v4l2loopback devices=1 card_label="AWC Virtual Cam" exclusive_caps=1
 ```
 
-The `.deb` package depends on `v4l2loopback-dkms` and loads the module on boot. Use **Tools → Run Setup Again** if the camera is missing.
+Then pick **AWC Virtual Cam** in Zoom, Meet, or OBS. `adb` must be on PATH for USB mode.
 
 ## Configuration
 

@@ -13,6 +13,17 @@ pub struct Device {
     model: String,
 }
 
+pub fn adb_is_available() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        true
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        linux_adb_path().is_file()
+    }
+}
+
 fn adb_bin(handle: &AppHandle) -> PathBuf {
     #[cfg(target_os = "windows")]
     {

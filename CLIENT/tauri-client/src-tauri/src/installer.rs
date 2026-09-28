@@ -35,7 +35,7 @@ pub async fn init_installer(handle: AppHandle) {
 
     #[cfg(target_os = "linux")]
     {
-        setup_linux_vcam(&handle).await;
+        check_linux_deps(&handle);
         report(&handle, "Exiting...", 100);
         let _ = handle.emit("close-installer", true);
         return;
@@ -306,94 +306,26 @@ async fn register_driver(handle: &AppHandle) -> Result<(), String> {
 }
 
 #[cfg(target_os = "linux")]
-async fn setup_linux_vcam(handle: &AppHandle) {
-    report(handle, "Checking v4l2loopback virtual camera...", 10);
+fn check_linux_deps(handle: &AppHandle) {
+    report(handle, "Checking adb...", 20);
+    if crate::adb::adb_is_available() {
+        report(handle, "adb found.", 40);
+    } else {
+        report(
+            handle,
+            "Error: adb was not found. Install Android platform-tools and add adb to PATH.",
+            20,
+        );
+    }
+
+    report(handle, "Checking v4l2loopback...", 60);
     if crate::vc::loopback_device_path().is_some() {
         report(
             handle,
-            "AWC Virtual Cam is already available as a system camera.",
+            "v4l2loopback device found. Start Virtual Cam to use it as a system camera.",
             100,
         );
         return;
     }
-
-    report(
-        handle,
-        "Installing v4l2loopback-dkms (password prompt may appear)...",
-        30,
-    );
-    match pkexec_bash(LINUX_VCAM_SETUP).await {
-        Ok(_) => {
-            if crate::vc::loopback_device_path().is_some() {
-                report(
-                    handle,
-                    "AWC Virtual Cam is ready. Zoom, Meet, and OBS can use it.",
-                    100,
-                );
-            } else {
-                report(
-                    handle,
-                    "v4l2loopback is installed. Reboot if the camera does not appear, then run Setup again.",
-                    80,
-                );
-            }
-        }
-        Err(e) => {
-            report(
-                handle,
-                &format!(
-                    "Could not set up the virtual camera: {}. Install with: sudo apt-get install v4l2loopback-dkms v4l2loopback-utils",
-                    e.trim()
-                ),
-                20,
-            );
-        }
-    }
-}
-
-#[cfg(target_os = "linux")]
-const LINUX_VCAM_SETUP: &str = r#"
-set -e
-export DEBIAN_FRONTEND=noninteractive
-if ! modinfo v4l2loopback >/dev/null 2>&1; then
-  apt-get update
-  apt-get install -y v4l2loopback-dkms v4l2loopback-utils linux-headers-$(uname -r)
-fi
-printf '%s\n' 'options v4l2loopback devices=1 card_label="AWC Virtual Cam" exclusive_caps=1' > /etc/modprobe.d/awc-v4l2loopback.conf
-printf '%s\n' 'v4l2loopback' > /etc/modules-load.d/awc-v4l2loopback.conf
-if ! grep -q 'AWC Virtual Cam' /sys/class/video4linux/*/name 2>/dev/null; then
-  if lsmod | grep -q '^v4l2loopback '; then
-    if command -v v4l2loopback-ctl >/dev/null 2>&1; then
-      v4l2loopback-ctl add -n 'AWC Virtual Cam'
-    else
-      echo 'v4l2loopback is loaded without AWC Virtual Cam. Install v4l2loopback-utils or reboot after this setup.' >&2
-      exit 1
-    fi
-  else
-    modprobe v4l2loopback devices=1 card_label="AWC Virtual Cam" exclusive_caps=1
-  fi
-fi
-"#;
-
-#[cfg(target_os = "linux")]
-async fn pkexec_bash(script: &str) -> Result<String, String> {
-    let output = tokio::process::Command::new("pkexec")
-        .args(["bash", "-c", script])
-        .output()
-        .await
-        .map_err(|e| {
-            format!(
-                "pkexec is missing or failed ({e}). Install with: sudo apt-get install v4l2loopback-dkms"
-            )
-        })?;
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-    } else {
-        let err = format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stderr),
-            String::from_utf8_lossy(&output.stdout)
-        );
-        Err(err)
-    }
+    report(handle, &crate::vc::missing_loopback_error(), 60);
 }

@@ -165,20 +165,18 @@ function Home() {
   };
 
   const handleVC = async () => {
-    let i = vc;
-    setVc(!i);
-    if (i === false) {
+    const turningOn = !vc;
+    try {
       await invoke("init_cam", {
-        on: !i,
+        on: turningOn,
         height: streamData.height,
         width: streamData.width,
       });
-    } else {
-      await invoke("init_cam", {
-        on: !i,
-        height: streamData.height,
-        width: streamData.width,
-      });
+      setVc(turningOn);
+    } catch (err) {
+      const message = err?.message || String(err);
+      showToast(message, true);
+      updateStatus(message, "error");
     }
   };
 
