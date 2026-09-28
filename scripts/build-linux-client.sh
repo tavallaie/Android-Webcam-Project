@@ -92,5 +92,21 @@ fi
 
 echo
 echo "Bundles:"
-ls -lah "$CLIENT/src-tauri/target/release/bundle/deb/"*.deb 2>/dev/null || true
-ls -lah "$CLIENT/src-tauri/target/release/bundle/appimage/"*.AppImage 2>/dev/null || true
+RELEASE_DIR="$ROOT/release/linux"
+mkdir -p "$RELEASE_DIR"
+
+shopt -s nullglob
+BUNDLES_TO_COPY=(
+  "$CLIENT/src-tauri/target/release/bundle/deb/"*.deb
+  "$CLIENT/src-tauri/target/release/bundle/appimage/"*.AppImage
+)
+if (( ${#BUNDLES_TO_COPY[@]} == 0 )); then
+  echo "Build completed, but no Linux bundles were found." >&2
+  exit 1
+fi
+
+for bundle in "${BUNDLES_TO_COPY[@]}"; do
+  cp -- "$bundle" "$RELEASE_DIR/"
+done
+
+ls -lah "$RELEASE_DIR"/*

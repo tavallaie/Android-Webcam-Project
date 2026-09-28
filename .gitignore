@@ -6,6 +6,7 @@ dist/
 *.jks
 *.keystore
 App Key/
+# Local build artifacts
 release/
 setup.bat
 setup.sh

@@ -47,8 +47,12 @@ shopt -s nullglob
 APKS=("$ANDROID_DIR/app/build/outputs/apk/$VARIANT"/app-"$VARIANT"*.apk)
 if (( ${#APKS[@]} > 0 )); then
   APK="${APKS[0]}"
+  RELEASE_DIR="$ROOT/release/android"
+  mkdir -p "$RELEASE_DIR"
+  RELEASE_APK="$RELEASE_DIR/AWA-$VARIANT.apk"
+  cp -- "$APK" "$RELEASE_APK"
   echo
-  echo "APK: $APK"
+  echo "APK: $RELEASE_APK"
 else
   echo "Build completed, but no APK was found under: $ANDROID_DIR/app/build/outputs/apk/$VARIANT" >&2
   exit 1
