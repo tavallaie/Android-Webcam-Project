@@ -56,24 +56,25 @@ fn decode_jpeg_to_bgr(jpeg_bytes: &[u8], width: u32, height: u32, out: &mut [u8]
 }
 
 #[tauri::command]
-pub fn init_cam(on: bool, height: u32, width: u32) -> Result<(), String> {
+pub fn init_cam(on: bool, height: u32, width: u32) -> Result<String, String> {
     println!("Cam Init {}", on);
     if on {
         if CAM_RUNNING.load(Ordering::Relaxed) {
-            return Ok(());
+            return Ok("Virtual camera already running".into());
         }
         CAM_RUNNING.store(true, Ordering::Relaxed);
         let handle = std::thread::spawn(move || {
             start_cam(height, width);
         });
         *CAM_THREAD.lock().unwrap() = Some(handle);
+        Ok("Virtual camera started".into())
     } else {
         CAM_RUNNING.store(false, Ordering::Relaxed);
         if let Some(handle) = CAM_THREAD.lock().unwrap().take() {
             handle.join().unwrap();
         }
+        Ok("Virtual camera stopped".into())
     }
-    Ok(())
 }
 
 fn start_cam(height: u32, width: u32) {

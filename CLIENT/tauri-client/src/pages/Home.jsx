@@ -167,12 +167,16 @@ function Home() {
   const handleVC = async () => {
     const turningOn = !vc;
     try {
-      await invoke("init_cam", {
+      const message = await invoke("init_cam", {
         on: turningOn,
         height: streamData.height,
         width: streamData.width,
       });
       setVc(turningOn);
+      if (message) {
+        updateStatus(message, turningOn ? "active" : "idle");
+        showToast(message, false);
+      }
     } catch (err) {
       const message = err?.message || String(err);
       showToast(message, true);

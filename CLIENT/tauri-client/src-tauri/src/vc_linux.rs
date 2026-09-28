@@ -2,6 +2,7 @@
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -75,27 +76,38 @@ fn decode_to_rgb(jpeg_bytes: &[u8], width: u32, height: u32, out: &mut [u8]) -> 
 }
 
 #[tauri::command]
-pub fn init_cam(on: bool, height: u32, width: u32) -> Result<(), String> {
+pub fn init_cam(on: bool, height: u32, width: u32) -> Result<String, String> {
     println!("Cam Init {}", on);
-    if on {
-        if loopback_device_path().is_none() {
-            return Err(missing_loopback_error());
-        }
-        if CAM_RUNNING.load(Ordering::Relaxed) {
-            return Ok(());
-        }
-        CAM_RUNNING.store(true, Ordering::Relaxed);
-        let handle = thread::spawn(move || {
-            start_cam(height, width);
-        });
-        *CAM_THREAD.lock().unwrap() = Some(handle);
-    } else {
+    if !on {
         CAM_RUNNING.store(false, Ordering::Relaxed);
         if let Some(handle) = CAM_THREAD.lock().unwrap().take() {
             let _ = handle.join();
         }
+        return Ok("Virtual camera stopped".into());
     }
-    Ok(())
+    if CAM_RUNNING.load(Ordering::Relaxed) {
+        return Ok("Virtual camera already running".into());
+    }
+
+    let (tx, rx) = mpsc::channel();
+    CAM_RUNNING.store(true, Ordering::Relaxed);
+    let handle = thread::spawn(move || start_cam(height, width, tx));
+    match rx.recv_timeout(Duration::from_secs(3)) {
+        Ok(Ok(msg)) => {
+            *CAM_THREAD.lock().unwrap() = Some(handle);
+            Ok(msg)
+        }
+        Ok(Err(e)) => {
+            CAM_RUNNING.store(false, Ordering::Relaxed);
+            let _ = handle.join();
+            Err(e)
+        }
+        Err(_) => {
+            CAM_RUNNING.store(false, Ordering::Relaxed);
+            let _ = handle.join();
+            Err("Timed out opening the virtual camera device".into())
+        }
+    }
 }
 
 fn rgb_to_yuyv(rgb: &[u8], yuyv: &mut [u8], width: u32, height: u32) {
@@ -128,12 +140,12 @@ fn rgb_to_yuyv(rgb: &[u8], yuyv: &mut [u8], width: u32, height: u32) {
     }
 }
 
-fn start_cam(height: u32, width: u32) {
+fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>>) {
     println!("Cam loop started (linux)");
     let v4l_w = width & !1;
 
     let Some(path) = loopback_device_path() else {
-        eprintln!("{}", missing_loopback_error());
+        let _ = ready.send(Err(missing_loopback_error()));
         CAM_RUNNING.store(false, Ordering::Relaxed);
         return;
     };
@@ -141,7 +153,10 @@ fn start_cam(height: u32, width: u32) {
     let mut dev = match Device::with_path(&path) {
         Ok(dev) => dev,
         Err(e) => {
-            eprintln!("Failed to open {}: {:?}", path.display(), e);
+            let _ = ready.send(Err(format!(
+                "Failed to open {}: {e}. Close other apps using this camera, then try again.",
+                path.display()
+            )));
             CAM_RUNNING.store(false, Ordering::Relaxed);
             return;
         }
@@ -155,44 +170,64 @@ fn start_cam(height: u32, width: u32) {
     fmt.fourcc = FourCC::new(b"YUYV");
     let fmt = match Output::set_format(&dev, &fmt) {
         Ok(fmt) => fmt,
-        Err(e) => {
-            eprintln!("Failed to set YUYV on {}: {:?}", path.display(), e);
-            CAM_RUNNING.store(false, Ordering::Relaxed);
-            return;
-        }
+        Err(_) => match Output::format(&dev) {
+            Ok(fmt) => fmt,
+            Err(e) => {
+                let _ = ready.send(Err(format!(
+                    "Failed to set format on {}: {e}",
+                    path.display()
+                )));
+                CAM_RUNNING.store(false, Ordering::Relaxed);
+                return;
+            }
+        },
     };
     println!("Linux vcam format in use:\n{}", fmt);
 
     let mut rgb_frame = vec![0u8; (width * height * 3) as usize];
     let mut yuyv_frame = vec![0u8; (v4l_w * height * 2) as usize];
+    for chunk in yuyv_frame.chunks_exact_mut(4) {
+        chunk[0] = 16;
+        chunk[1] = 128;
+        chunk[2] = 16;
+        chunk[3] = 128;
+    }
 
+    let _ = ready.send(Ok(format!(
+        "Virtual camera on {} ({}). Leave Virtual Cam running so Zoom and Meet can see it.",
+        path.display(),
+        std::fs::read_to_string(format!(
+            "/sys/class/video4linux/{}/name",
+            path.file_name().unwrap_or_default().to_string_lossy()
+        ))
+        .unwrap_or_default()
+        .trim()
+    )));
+
+    // exclusive_caps=1 only advertises CAPTURE while a producer keeps writing.
     while CAM_RUNNING.load(Ordering::Relaxed) {
-        let frame = LATEST_FRAME.lock().unwrap().take();
-        let Some(frame) = frame else {
-            thread::sleep(Duration::from_millis(5));
-            continue;
-        };
-
-        match frame {
-            IncomingFrame::Jpeg(jpeg_bytes) => {
-                if !decode_to_rgb(&jpeg_bytes, width, height, &mut rgb_frame) {
-                    continue;
+        if let Some(frame) = LATEST_FRAME.lock().unwrap().take() {
+            match frame {
+                IncomingFrame::Jpeg(jpeg_bytes) => {
+                    if decode_to_rgb(&jpeg_bytes, width, height, &mut rgb_frame) {
+                        rgb_to_yuyv(&rgb_frame, &mut yuyv_frame, v4l_w, height);
+                    }
                 }
-            }
-            IncomingFrame::RawBgr(mut bgr_bytes) => {
-                if bgr_bytes.len() != rgb_frame.len() {
-                    continue;
+                IncomingFrame::RawBgr(mut bgr_bytes) => {
+                    if bgr_bytes.len() == rgb_frame.len() {
+                        for chunk in bgr_bytes.chunks_exact_mut(3) {
+                            chunk.swap(0, 2);
+                        }
+                        rgb_frame.copy_from_slice(&bgr_bytes);
+                        rgb_to_yuyv(&rgb_frame, &mut yuyv_frame, v4l_w, height);
+                    }
                 }
-                for chunk in bgr_bytes.chunks_exact_mut(3) {
-                    chunk.swap(0, 2);
-                }
-                rgb_frame.copy_from_slice(&bgr_bytes);
             }
         }
 
-        rgb_to_yuyv(&rgb_frame, &mut yuyv_frame, v4l_w, height);
         if let Err(e) = dev.write_all(&yuyv_frame) {
             eprintln!("Failed writing frame to v4l2loopback: {:?}", e);
         }
+        thread::sleep(Duration::from_millis(33));
     }
 }
