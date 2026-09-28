@@ -222,39 +222,46 @@ unsafe fn try_attach_hw(
     decoder_codec: &ff::Codec,
     hwaccel_type: ffi::AVHWDeviceType,
 ) -> bool {
-    let mut i = 0;
-    let mut matched_fmt: Option<ffi::AVPixelFormat> = None;
-    loop {
-        let config = ffi::avcodec_get_hw_config(decoder_codec.as_ptr(), i);
-        if config.is_null() {
-            break;
+    unsafe {
+        let mut i = 0;
+        let mut matched_fmt: Option<ffi::AVPixelFormat> = None;
+        loop {
+            let config = ffi::avcodec_get_hw_config(decoder_codec.as_ptr(), i);
+            if config.is_null() {
+                break;
+            }
+            let cfg = *config;
+            if (cfg.methods & ffi::AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX as i32) != 0
+                && cfg.device_type == hwaccel_type
+            {
+                matched_fmt = Some(cfg.pix_fmt);
+                break;
+            }
+            i += 1;
         }
-        let cfg = *config;
-        if (cfg.methods & ffi::AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX as i32) != 0
-            && cfg.device_type == hwaccel_type
-        {
-            matched_fmt = Some(cfg.pix_fmt);
-            break;
+
+        let Some(fmt) = matched_fmt else {
+            return false;
+        };
+
+        let mut hw_device_ctx: *mut ffi::AVBufferRef = ptr::null_mut();
+        let ret = ffi::av_hwdevice_ctx_create(
+            &mut hw_device_ctx,
+            hwaccel_type,
+            ptr::null(),
+            ptr::null_mut(),
+            0,
+        );
+        if ret < 0 {
+            return false;
         }
-        i += 1;
+
+        HW_PIX_FMT = fmt;
+        let ctx_ptr = decoder.as_mut_ptr();
+        (*ctx_ptr).hw_device_ctx = ffi::av_buffer_ref(hw_device_ctx);
+        (*ctx_ptr).get_format = Some(get_hw_format);
+        true
     }
-
-    let Some(fmt) = matched_fmt else {
-        return false;
-    };
-
-    let mut hw_device_ctx: *mut ffi::AVBufferRef = ptr::null_mut();
-    let ret =
-        ffi::av_hwdevice_ctx_create(&mut hw_device_ctx, hwaccel_type, ptr::null(), ptr::null_mut(), 0);
-    if ret < 0 {
-        return false;
-    }
-
-    HW_PIX_FMT = fmt;
-    let ctx_ptr = decoder.as_mut_ptr();
-    (*ctx_ptr).hw_device_ctx = ffi::av_buffer_ref(hw_device_ctx);
-    (*ctx_ptr).get_format = Some(get_hw_format);
-    true
 }
 
 fn open_rtsp_stream(

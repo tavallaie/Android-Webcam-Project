@@ -127,6 +127,9 @@ button {
 :root {
   --awc-bg: #08111f;
   --awc-text: #e2e8f0;
+  --awc-control-bg: #101c2d;
+  --awc-control-text: #e2e8f0;
+  --awc-control-border: #314257;
   --color-slate-950: #08111f;
   --color-slate-900: #101c2d;
   --color-slate-800: #1b2a3d;
@@ -143,6 +146,9 @@ button {
   :root {
     --awc-bg: #f4f7fb;
     --awc-text: #172033;
+    --awc-control-bg: #ffffff;
+    --awc-control-text: #172033;
+    --awc-control-border: #b8c5d4;
     --color-slate-950: #f4f7fb;
     --color-slate-900: #ffffff;
     --color-slate-800: #e8eef5;
@@ -207,7 +213,28 @@ button {
 }
 
 .field-control {
-  @apply rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
+  @apply rounded-lg px-2 py-1.5 text-xs outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
+  background: var(--awc-control-bg);
+  border: 1px solid var(--awc-control-border);
+  color: var(--awc-control-text);
+  color-scheme: dark;
+}
+
+select,
+select option {
+  background-color: var(--awc-control-bg);
+  color: var(--awc-control-text);
+}
+
+select {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  .field-control,
+  select {
+    color-scheme: light;
+  }
 }
 
 .icon-control {

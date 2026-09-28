@@ -464,11 +464,11 @@ function Home() {
     <>
       <div className="app-shell flex h-screen text-slate-200">
         {/* Sidebar */}
-        <aside className="app-sidebar w-72 glass border-r border-slate-800 p-4 flex flex-col gap-4 z-10 overflow-y-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20">
+        <aside className="app-sidebar w-64 glass border-r border-slate-800 p-3 flex flex-col gap-3 z-10 overflow-y-auto">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center shadow-lg shadow-brand-500/20">
               <svg
-                className="w-6 h-6 text-white"
+                className="w-5 h-5 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -481,9 +481,9 @@ function Home() {
                 />
               </svg>
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-white">
+            <h1 className="text-lg font-bold tracking-tight text-white">
               AWC{" "}
-              <span className="text-[10px] font-medium px-2 py-0.5 bg-slate-800 rounded-full text-slate-400 align-middle ml-1">
+              <span className="text-[9px] font-medium px-1.5 py-0.5 bg-slate-800 rounded-full text-slate-400 align-middle ml-1">
                 v{appVersion}
               </span>
             </h1>
@@ -491,15 +491,15 @@ function Home() {
 
           <hr className="border-slate-800" />
 
-          <div className="space-y-4">
-            <div className="space-y-3">
+          <div className="space-y-3">
+            <div className="space-y-2">
               <div>
-                <p className="text-xs font-semibold text-slate-300">Connection</p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="text-[11px] font-semibold text-slate-300">Connection</p>
+                <p className="mt-0.5 text-[10px] text-slate-500">
                   Choose how this computer reaches your phone.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 gap-1">
                 <button
                   type="button"
                   onClick={() => !isConnected && setMode("usb")}
@@ -521,7 +521,7 @@ function Home() {
                   <span className="mode-card-detail">No cable needed</span>
                 </button>
               </div>
-              <p className="text-[11px] leading-relaxed text-slate-500">
+              <p className="text-[10px] leading-snug text-slate-500">
                 {mode === "usb"
                   ? "Connect your phone with USB debugging enabled. AWC will forward the stream through ADB."
                   : "Connect both devices to the same network, then enter the phone's local IP address."}
@@ -538,7 +538,7 @@ function Home() {
                       onChange={(e) => {
                         handleDeviceSelect(e);
                       }}
-                      className="field-control flex-1"
+                      className="field-control min-w-0 flex-1"
                     >
                       {devices.length > 0 ? (
                         <>
@@ -558,7 +558,7 @@ function Home() {
                         setDevices([]);
                         handleGetDevices();
                       }}
-                      className="icon-control"
+                      className="icon-control h-8 w-8"
                     >
                       <svg
                         className={`w-[1.4rem] h-[1.4rem] p-1 ${devicesLoading ? "animate-spin" : ""}`}
@@ -607,7 +607,7 @@ function Home() {
                     setStreamProtocol(e.target.value);
                   }}
                   id="streamProtocol"
-                  className="field-control"
+                  className="field-control w-full"
                 >
                   <option className="bg-white" value="mjpeg">
                     MJPEG
@@ -624,7 +624,7 @@ function Home() {
                   onClick={handleToggle}
                 id="toggleConnectBtn"
                 disabled={connectButtonDisable}
-                className={`w-full ${connectButtonDisable ? "bg-slate-500 hover:bg-slate-600 cursor-not-allowed text-white" : isConnected ? "bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 cursor-pointer" : "bg-brand-500 hover:bg-brand-600 text-white cursor-pointer"} font-semibold py-2.5 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2`}
+                className={`w-full ${connectButtonDisable ? "bg-slate-500 hover:bg-slate-600 cursor-not-allowed text-white" : isConnected ? "bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 cursor-pointer" : "bg-brand-500 hover:bg-brand-600 text-white cursor-pointer"} font-semibold py-2 rounded-lg text-xs transition-all active:scale-95 flex items-center justify-center gap-2`}
               >
                 <span id="toggleConnectBtnText">{connectButtonText}</span>
               </button>
@@ -632,7 +632,7 @@ function Home() {
           </div>
 
           {showControls && (
-            <div className="space-y-4 pt-2 border-t border-slate-800">
+            <div className="space-y-3 pt-2 border-t border-slate-800">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Camera Controls
@@ -660,14 +660,14 @@ function Home() {
               <div className="flex">
                 <button
                   onClick={handleSwitchCamera}
-                  className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2 m-1"
+                  className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-2"
                 >
                   {camera === "front" ? "Switch to Back" : "Switch to Front"}
                 </button>
 
                 <button
                   onClick={handleFlash}
-                  className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2 m-1"
+                  className="w-full border border-slate-700 hover:border-brand-500/50 hover:bg-brand-500/10 text-slate-300 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-2"
                 >
                   {isFlashOn ? "Turn off Flash" : "Turn on Flash"}
                 </button>
@@ -692,7 +692,7 @@ function Home() {
                       `${e.target.value}`,
                     )
                   }
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-300 outline-none focus:ring-1 focus:ring-brand-500"
+                  className="field-control w-full"
                 >
                   {resolutions.map((res) => (
                     <option key={res} value={res}>
@@ -717,7 +717,7 @@ function Home() {
                         "focusMode",
                       );
                     }}
-                    className="bg-transparent text-[10px] text-brand-400 font-bold outline-none cursor-pointer"
+                    className="field-control w-auto bg-transparent px-1 py-0 text-[10px] text-brand-400 font-bold outline-none cursor-pointer"
                   >
                     <option value="0" className="bg-slate-900">
                       AUTO
@@ -776,7 +776,7 @@ function Home() {
                 )}
               </div>
 
-              <div className="space-y-2 pt-2 border-t border-slate-800/50">
+              <div className="space-y-1.5 pt-2 border-t border-slate-800/50">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[10px] text-slate-500 font-bold uppercase">
                     Exposure
@@ -814,7 +814,7 @@ function Home() {
             </div>
           )}
 
-          <div className="space-y-3 pt-2 border-t border-slate-800">
+          <div className="space-y-2 pt-2 border-t border-slate-800">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
               Tools
             </label>
@@ -824,14 +824,14 @@ function Home() {
               onClick={() => {
                 handleVC();
               }}
-              className={`w-full border  ${!vc && "hover:border-emerald-500/50"} ${vc ? "border-red-500" : "border-slate-700"} ${vc && "hover:bg-red-500/10"} ${!vc && "hover:bg-emerald-500/10"}   text-slate-300 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-30`}
+              className={`w-full border  ${!vc && "hover:border-emerald-500/50"} ${vc ? "border-red-500" : "border-slate-700"} ${vc && "hover:bg-red-500/10"} ${!vc && "hover:bg-emerald-500/10"}   text-slate-300 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-30`}
             >
               {!vc ? "Start Virtual Cam" : "Stop"}
             </button>
           </div>
 
-          <div className="mt-auto p-3 bg-slate-900/80 rounded-xl border border-slate-800/50 shrink-0">
-            <div className="flex items-center justify-between mb-2">
+          <div className="mt-auto p-2 bg-slate-900/80 rounded-lg border border-slate-800/50 shrink-0">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-slate-500">Status</span>
               <span
                 id="modeIndicator"
@@ -842,7 +842,7 @@ function Home() {
             </div>
             <div
               id="status"
-              className={`text-sm font-medium italic ${status.state === "error" ? "text-red-400" : ""} ${status.state === "active" ? "text-emerald-400" : ""} ${status.state === "idle" ? "text-brand-500" : ""}`}
+              className={`text-xs font-medium italic ${status.state === "error" ? "text-red-400" : ""} ${status.state === "active" ? "text-emerald-400" : ""} ${status.state === "idle" ? "text-brand-500" : ""}`}
             >
               {status.message}
             </div>
@@ -856,14 +856,14 @@ function Home() {
             <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-emerald-600/5 rounded-full blur-[120px]"></div>
           </div>
 
-          <div className="flex-1 flex items-center justify-center p-6">
+          <div className="flex-1 flex items-center justify-center p-4">
             <div
               id="placeholder"
-              className={`${isConnected ? "hidden" : "block"} max-w-md text-center space-y-6`}
+              className={`${isConnected ? "hidden" : "block"} max-w-md text-center space-y-4`}
             >
-              <div className="w-20 h-20 bg-slate-800/50 rounded-3xl mx-auto flex items-center justify-center border border-slate-700">
+              <div className="w-16 h-16 bg-slate-800/50 rounded-2xl mx-auto flex items-center justify-center border border-slate-700">
                 <svg
-                  className="w-10 h-10 text-slate-500"
+                  className="w-8 h-8 text-slate-500"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -877,10 +877,10 @@ function Home() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-white mb-2">
+                <h2 className="text-xl font-bold text-white mb-1">
                   {mode === "usb" ? "Connect over USB" : "Connect over Wi‑Fi"}
                 </h2>
-                <p className="text-slate-400 text-sm leading-relaxed">
+                <p className="text-slate-400 text-xs leading-relaxed">
                   {mode === "usb"
                     ? "Plug in your phone, choose it in the sidebar, and start the stream."
                     : "Enter the phone's IP address, then start the stream on both devices."}
