@@ -143,8 +143,13 @@ function Home() {
 
   const handleGetDevices = async () => {
     setDevicesLoading(true);
-    let devices = await invoke("adb_get_devices");
-    setDevices(devices);
+    try {
+      let listed = await invoke("adb_get_devices");
+      setDevices(listed);
+    } catch (err) {
+      console.error(err);
+      setDevices([]);
+    }
     setDevicesLoading(false);
   };
 
@@ -200,27 +205,46 @@ function Home() {
     updateStatus("Querying device features...", "idle");
 
     try {
+      if (mode === "usb") {
+        updateStatus("Setting up USB (adb)...", "idle");
+        const listed =
+          devices.length > 0 ? devices : await invoke("adb_get_devices");
+        if (!listed.length) {
+          throw new Error(
+            "No USB phone found. Enable USB debugging, or use WiFi.",
+          );
+        }
+        const device = listed[0];
+        await invoke("adb_connect_device", {
+          deviceId: device.id,
+          deviceModel: device.model,
+        });
+        setDevices(listed);
+      }
+
       const response = await fetchUrl(`http://${phoneIP}:${httpPort}/features`);
+      if (!response.ok) {
+        throw new Error(`Phone HTTP ${response.status} at ${phoneIP}:${httpPort}`);
+      }
       const features = await response.json();
 
-      setStreamProtocol("mjpeg");
+      let protocol = "mjpeg";
       let targetUrl = `http://${phoneIP}:${httpPort}/video`;
       const isRtsp =
         features.stream_protocol && features.stream_protocol.includes("RTSP");
 
       if (isRtsp) {
-        setStreamProtocol("rtsp");
-        setRtspPort(features.stream_port || rtspPort);
-        targetUrl = `rtsp://${phoneIP}:${rtspPort}`;
+        protocol = "rtsp";
+        const port = features.stream_port || rtspPort;
+        setRtspPort(port);
+        targetUrl = `rtsp://${phoneIP}:${port}`;
       }
+      setStreamProtocol(protocol);
 
-      updateStatus(
-        `Starting ${streamProtocol.toUpperCase()} stream...`,
-        "idle",
-      );
+      updateStatus(`Starting ${protocol.toUpperCase()} stream...`, "idle");
 
       await invoke("start_sender", {
-        source: streamProtocol,
+        source: protocol,
         url: targetUrl,
       });
 
@@ -239,8 +263,17 @@ function Home() {
       await initializeDeviceSync();
     } catch (err) {
       console.error("Failed to fetch features or connect:", err);
-      updateStatus("Connection failed", "error");
-      handleDisconnect();
+      const message =
+        err?.message ||
+        (typeof err === "string" ? err : "Connection failed");
+      updateStatus(message, "error");
+      setIsConnected(false);
+      setConnectButtonDisable(false);
+      setConnectButtonText("Connect");
+      setShowControls(false);
+      try {
+        await invoke("stop_sender");
+      } catch (_) {}
     }
   };
 
@@ -391,7 +424,7 @@ function Home() {
     sendControl(`flash=${!isFlashOn}`);
   };
 
-  const fetchUrl = async (url, { timeoutMs = 3000, ...options } = {}) => {
+  const fetchUrl = async (url, { timeoutMs = 8000, ...options } = {}) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
