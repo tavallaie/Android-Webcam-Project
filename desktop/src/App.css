@@ -123,6 +123,43 @@ button {
   --color-brand-500: #38bdf8;
   --color-brand-600: #0284c7;
 }
+
+:root {
+  --awc-bg: #08111f;
+  --awc-text: #e2e8f0;
+  --color-slate-950: #08111f;
+  --color-slate-900: #101c2d;
+  --color-slate-800: #1b2a3d;
+  --color-slate-700: #314257;
+  --color-slate-600: #52657b;
+  --color-slate-500: #8191a5;
+  --color-slate-400: #aebaca;
+  --color-slate-300: #cbd5e1;
+  --color-slate-200: #e2e8f0;
+  --color-slate-100: #f1f5f9;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --awc-bg: #f4f7fb;
+    --awc-text: #172033;
+    --color-slate-950: #f4f7fb;
+    --color-slate-900: #ffffff;
+    --color-slate-800: #e8eef5;
+    --color-slate-700: #d1dbe7;
+    --color-slate-600: #9aaabd;
+    --color-slate-500: #64748b;
+    --color-slate-400: #526175;
+    --color-slate-300: #334155;
+    --color-slate-200: #1e293b;
+    --color-slate-100: #0f172a;
+  }
+
+  .app-sidebar h1,
+  .app-main h2 {
+    color: var(--color-slate-100);
+  }
+}
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -149,8 +186,16 @@ button {
 
 @layer base {
   body {
-    @apply bg-[#0f172a] text-slate-200 antialiased h-screen overflow-hidden;
+    @apply text-slate-200 antialiased h-screen overflow-hidden;
+    background: var(--awc-bg);
+    color: var(--awc-text);
   }
+}
+
+.app-shell,
+.app-main {
+  background: var(--awc-bg);
+  color: var(--awc-text);
 }
 
 .glass {
@@ -170,7 +215,7 @@ button {
 }
 
 .mode-card {
-  @apply flex cursor-pointer flex-col items-start gap-1 rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-left transition-all hover:border-slate-600 hover:bg-slate-800/70 disabled:cursor-not-allowed disabled:opacity-60;
+  @apply flex cursor-pointer flex-col items-start gap-0.5 rounded-lg border border-slate-800 bg-slate-950/50 p-2.5 text-left transition-all hover:border-slate-600 hover:bg-slate-800/70 disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 .mode-card-active {
@@ -178,7 +223,7 @@ button {
 }
 
 .mode-card-icon {
-  @apply flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 text-lg text-brand-400;
+  @apply flex h-6 w-6 items-center justify-center rounded-md bg-slate-800 text-base text-brand-400;
 }
 
 .mode-card-title {

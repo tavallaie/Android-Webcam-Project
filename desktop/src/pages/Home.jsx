@@ -462,9 +462,9 @@ function Home() {
   };
   return (
     <>
-      <div className="flex h-screen bg-slate-950 text-slate-200">
+      <div className="app-shell flex h-screen text-slate-200">
         {/* Sidebar */}
-        <aside className="w-80 glass border-r border-slate-800 p-6 flex flex-col gap-6 z-10 overflow-y-auto">
+        <aside className="app-sidebar w-72 glass border-r border-slate-800 p-4 flex flex-col gap-4 z-10 overflow-y-auto">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20">
               <svg
@@ -499,7 +499,7 @@ function Home() {
                   Choose how this computer reaches your phone.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 <button
                   type="button"
                   onClick={() => !isConnected && setMode("usb")}
@@ -830,7 +830,7 @@ function Home() {
             </button>
           </div>
 
-          <div className="mt-auto p-4 bg-slate-900/80 rounded-xl border border-slate-800/50 shrink-0">
+          <div className="mt-auto p-3 bg-slate-900/80 rounded-xl border border-slate-800/50 shrink-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-slate-500">Status</span>
               <span
@@ -850,13 +850,13 @@ function Home() {
         </aside>
 
         {/* Main */}
-        <main className="flex-1 relative flex flex-col bg-[#020617]">
+        <main className="app-main flex-1 relative flex flex-col">
           <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
             <div className="absolute -top-24 -right-24 w-96 h-96 bg-brand-600/10 rounded-full blur-[120px]"></div>
             <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-emerald-600/5 rounded-full blur-[120px]"></div>
           </div>
 
-          <div className="flex-1 flex items-center justify-center p-8">
+          <div className="flex-1 flex items-center justify-center p-6">
             <div
               id="placeholder"
               className={`${isConnected ? "hidden" : "block"} max-w-md text-center space-y-6`}
