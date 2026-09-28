@@ -1,11 +1,18 @@
 use serde::Serialize;
+#[cfg(target_os = "windows")]
 use std::env::consts::OS;
+#[cfg(target_os = "windows")]
 use std::fs::write;
+#[cfg(target_os = "windows")]
 use std::process::Command;
+#[cfg(target_os = "windows")]
 use std::{env, path::PathBuf};
 use tauri::Emitter;
+#[cfg(target_os = "windows")]
 use tauri::path::BaseDirectory;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+#[cfg(target_os = "windows")]
+use tauri::Manager;
 // use std::{thread, time::Duration};
 
 #[derive(Clone, Serialize)]
@@ -14,6 +21,7 @@ struct Progress {
     percent: u8,
 }
 
+#[cfg(target_os = "windows")]
 const REQUIRED_FILES: &[&str] = &[
 //     "sender.exe",
     "softcam.dll",
@@ -25,14 +33,24 @@ const REQUIRED_FILES: &[&str] = &[
 pub async fn init_installer(handle: AppHandle) {
     println!("Installer code on Rust initiated!");
 
-    // MSVC and softcam are Windows-only. Linux uses v4l2loopback.
-    if OS != "windows" {
+    #[cfg(target_os = "linux")]
+    {
+        setup_linux_vcam(&handle).await;
+        report(&handle, "Exiting...", 100);
+        let _ = handle.emit("close-installer", true);
+        return;
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
         report(&handle, "Windows driver setup skipped on this OS.", 100);
         report(&handle, "Exiting...", 100);
         let _ = handle.emit("close-installer", true);
         return;
     }
 
+    #[cfg(target_os = "windows")]
+    {
     //step - 1:
 
     let (ok, missing) = check_required_files(&handle);
@@ -84,11 +102,13 @@ pub async fn init_installer(handle: AppHandle) {
     }
     report(&handle, "Exiting...", 100);
     handle.emit("close-installer", true).unwrap();
+    }
 }
 
 // ------------ Helper functions ------------
 
 // returns a valid path
+#[cfg(target_os = "windows")]
 fn get_file_path(handle: &AppHandle, file: &str) -> PathBuf {
     if cfg!(debug_assertions) {
         let base = env::current_exe().unwrap().parent().unwrap().to_path_buf();
@@ -117,6 +137,7 @@ fn report(handle: &AppHandle, msg: &str, pct: u8) {
 }
 
 //downloads file
+#[cfg(target_os = "windows")]
 async fn download_file(url: &str, dest: &PathBuf, _handle: &AppHandle) -> Result<(), String> {
     let bytes = reqwest::get(url)
         .await
@@ -129,6 +150,7 @@ async fn download_file(url: &str, dest: &PathBuf, _handle: &AppHandle) -> Result
 }
 
 // step - 1 : checking required files
+#[cfg(target_os = "windows")]
 fn check_required_files(handle: &AppHandle) -> (bool, Vec<String>) {
     let mut missing = Vec::new();
 
@@ -154,6 +176,7 @@ fn check_required_files(handle: &AppHandle) -> (bool, Vec<String>) {
 }
 
 //step - 2 : checking MSVC
+#[cfg(target_os = "windows")]
 async fn check_msvc(_handle: &AppHandle) -> bool {
     if OS != "windows" {
         return true;
@@ -189,6 +212,7 @@ async fn check_msvc(_handle: &AppHandle) -> bool {
 }
 
 //installing MSVC if not installed
+#[cfg(target_os = "windows")]
 async fn install_msvc(handle: &tauri::AppHandle) -> Result<bool, String> {
     let url = "https://aka.ms/vs/17/release/vc_redist.x64.exe";
 
@@ -225,6 +249,7 @@ async fn install_msvc(handle: &tauri::AppHandle) -> Result<bool, String> {
 }
 
 //step - 3:
+#[cfg(target_os = "windows")]
 fn check_softcam_registered() -> bool {
     let output = Command::new("reg")
         .args([
@@ -242,6 +267,7 @@ fn check_softcam_registered() -> bool {
     false
 }
 
+#[cfg(target_os = "windows")]
 async fn register_driver(handle: &AppHandle) -> Result<(), String> {
     if OS != "windows" {
         return Ok(());
@@ -276,5 +302,98 @@ async fn register_driver(handle: &AppHandle) -> Result<(), String> {
         Ok(())
     } else {
         Err("Failed to register softcam.dll. Try running as administrator.".to_string())
+    }
+}
+
+#[cfg(target_os = "linux")]
+async fn setup_linux_vcam(handle: &AppHandle) {
+    report(handle, "Checking v4l2loopback virtual camera...", 10);
+    if crate::vc::loopback_device_path().is_some() {
+        report(
+            handle,
+            "AWC Virtual Cam is already available as a system camera.",
+            100,
+        );
+        return;
+    }
+
+    report(
+        handle,
+        "Installing v4l2loopback-dkms (password prompt may appear)...",
+        30,
+    );
+    match pkexec_bash(LINUX_VCAM_SETUP).await {
+        Ok(_) => {
+            if crate::vc::loopback_device_path().is_some() {
+                report(
+                    handle,
+                    "AWC Virtual Cam is ready. Zoom, Meet, and OBS can use it.",
+                    100,
+                );
+            } else {
+                report(
+                    handle,
+                    "v4l2loopback is installed. Reboot if the camera does not appear, then run Setup again.",
+                    80,
+                );
+            }
+        }
+        Err(e) => {
+            report(
+                handle,
+                &format!(
+                    "Could not set up the virtual camera: {}. Install with: sudo apt-get install v4l2loopback-dkms v4l2loopback-utils",
+                    e.trim()
+                ),
+                20,
+            );
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+const LINUX_VCAM_SETUP: &str = r#"
+set -e
+export DEBIAN_FRONTEND=noninteractive
+if ! modinfo v4l2loopback >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y v4l2loopback-dkms v4l2loopback-utils linux-headers-$(uname -r)
+fi
+printf '%s\n' 'options v4l2loopback devices=1 card_label="AWC Virtual Cam" exclusive_caps=1' > /etc/modprobe.d/awc-v4l2loopback.conf
+printf '%s\n' 'v4l2loopback' > /etc/modules-load.d/awc-v4l2loopback.conf
+if ! grep -q 'AWC Virtual Cam' /sys/class/video4linux/*/name 2>/dev/null; then
+  if lsmod | grep -q '^v4l2loopback '; then
+    if command -v v4l2loopback-ctl >/dev/null 2>&1; then
+      v4l2loopback-ctl add -n 'AWC Virtual Cam'
+    else
+      echo 'v4l2loopback is loaded without AWC Virtual Cam. Install v4l2loopback-utils or reboot after this setup.' >&2
+      exit 1
+    fi
+  else
+    modprobe v4l2loopback devices=1 card_label="AWC Virtual Cam" exclusive_caps=1
+  fi
+fi
+"#;
+
+#[cfg(target_os = "linux")]
+async fn pkexec_bash(script: &str) -> Result<String, String> {
+    let output = tokio::process::Command::new("pkexec")
+        .args(["bash", "-c", script])
+        .output()
+        .await
+        .map_err(|e| {
+            format!(
+                "pkexec is missing or failed ({e}). Install with: sudo apt-get install v4l2loopback-dkms"
+            )
+        })?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    } else {
+        let err = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        );
+        Err(err)
     }
 }

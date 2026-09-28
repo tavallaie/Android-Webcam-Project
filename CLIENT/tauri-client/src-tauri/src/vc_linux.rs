@@ -1,5 +1,6 @@
 // vc_linux.rs — Pure virtual camera sink for Linux (v4l2loopback)
 use std::io::Write;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
@@ -7,6 +8,22 @@ use std::time::Duration;
 use v4l::video::Output;
 use v4l::{Device, FourCC, Format};
 use zune_jpeg::JpegDecoder;
+
+pub const CARD_LABEL: &str = "AWC Virtual Cam";
+
+pub fn loopback_device_path() -> Option<PathBuf> {
+    let entries = std::fs::read_dir("/sys/class/video4linux").ok()?;
+    for entry in entries.flatten() {
+        let name = std::fs::read_to_string(entry.path().join("name")).unwrap_or_default();
+        if name.trim() == CARD_LABEL {
+            return Some(PathBuf::from(format!(
+                "/dev/{}",
+                entry.file_name().to_string_lossy()
+            )));
+        }
+    }
+    None
+}
 
 static CAM_RUNNING: AtomicBool = AtomicBool::new(false);
 static CAM_THREAD: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
@@ -62,7 +79,23 @@ pub fn init_cam(on: bool, height: u32, width: u32) {
 fn start_cam(height: u32, width: u32) {
     println!("Cam loop started (linux)");
 
-    let mut dev = Device::with_path("/dev/video0").expect("Failed to open v4l2loopback device");
+    let Some(path) = loopback_device_path() else {
+        eprintln!(
+            "No {} v4l2loopback device. Run Setup from the Tools menu, or install v4l2loopback-dkms.",
+            CARD_LABEL
+        );
+        CAM_RUNNING.store(false, Ordering::Relaxed);
+        return;
+    };
+    println!("Using loopback device {}", path.display());
+    let mut dev = match Device::with_path(&path) {
+        Ok(dev) => dev,
+        Err(e) => {
+            eprintln!("Failed to open {}: {:?}", path.display(), e);
+            CAM_RUNNING.store(false, Ordering::Relaxed);
+            return;
+        }
+    };
 
     // Use Output::format and Output::set_format explicitly to target V4L2_BUF_TYPE_VIDEO_OUTPUT.
     // This allows exclusive_caps=1 mode on v4l2loopback without returning EINVAL.

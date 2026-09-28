@@ -41,7 +41,16 @@
     },
     "linux": {
       "deb": {
-        "depends": ["v4l2loopback-dkms", "ffmpeg"]
+        "depends": [
+          "v4l2loopback-dkms",
+          "v4l2loopback-utils",
+          "linux-headers-generic",
+          "ffmpeg"
+        ],
+        "files": {
+          "/etc/modprobe.d/awc-v4l2loopback.conf": "linux/awc-v4l2loopback.conf",
+          "/etc/modules-load.d/awc-v4l2loopback.conf": "linux/awc-v4l2loopback-modules.conf"
+        }
       }
     },
     "resources": [
