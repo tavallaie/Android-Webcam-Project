@@ -59,6 +59,6 @@
       "adb/*"
     ],
     "license": "GPL-3.0",
-    "licenseFile": "../../../LICENSE"
+    "licenseFile": "../../LICENSE"
   }
 }

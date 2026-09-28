@@ -14,8 +14,8 @@ Run these commands in the Verify step. Report the result of each one. Show the o
 
 | Command | Gate |
 |---------|------|
-| `pnpm --dir CLIENT/tauri-client install --frozen-lockfile` | Install succeeds. |
-| `./scripts/build-linux-client.sh` | Linux bundles exist under `CLIENT/tauri-client/src-tauri/target/release/bundle`. |
+| `pnpm --dir desktop install --frozen-lockfile` | Install succeeds. |
+| `./scripts/build-linux-client.sh` | Linux bundles exist under `desktop/src-tauri/target/release/bundle`. |
 
 ## Integration branches
 

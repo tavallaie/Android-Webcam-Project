@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "CLIENT/tauri-client/**"
+      - "desktop/**"
       - "scripts/build-linux-client.sh"
       - ".github/workflows/linux-client.yml"
   pull_request:
     paths:
-      - "CLIENT/tauri-client/**"
+      - "desktop/**"
       - "scripts/build-linux-client.sh"
       - ".github/workflows/linux-client.yml"
 
@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: CLIENT/tauri-client/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -68,19 +68,19 @@ jobs:
             libswresample-dev
 
       - name: Install frontend dependencies
-        working-directory: CLIENT/tauri-client
+        working-directory: desktop
         run: pnpm install --frozen-lockfile
 
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: CLIENT/tauri-client
+          projectPath: desktop
           args: --bundles deb,appimage
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-client
           path: |
-            CLIENT/tauri-client/src-tauri/target/release/bundle/deb/*.deb
-            CLIENT/tauri-client/src-tauri/target/release/bundle/appimage/*.AppImage
+            desktop/src-tauri/target/release/bundle/deb/*.deb
+            desktop/src-tauri/target/release/bundle/appimage/*.AppImage

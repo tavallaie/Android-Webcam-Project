@@ -115,15 +115,15 @@ That command builds `.deb` and AppImage. Pass `appimage` or `deb` to build one b
 
 Output:
 
-- `CLIENT/tauri-client/src-tauri/target/release/bundle/deb/`
-- `CLIENT/tauri-client/src-tauri/target/release/bundle/appimage/`
+- `desktop/src-tauri/target/release/bundle/deb/`
+- `desktop/src-tauri/target/release/bundle/appimage/`
 
 The script uses Docker when the host is missing GTK, WebKit, v4l, or FFmpeg 8 headers. Host Node, pnpm, and Rust stay required.
 
 When those system packages are already installed:
 
 ```bash
-cd CLIENT/tauri-client
+cd desktop
 pnpm install
 pnpm run build:linux
 ```

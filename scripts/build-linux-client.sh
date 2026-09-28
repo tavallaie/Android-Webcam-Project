@@ -8,7 +8,7 @@ set -euo pipefail
 #   ./scripts/build-linux-client.sh deb
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLIENT="$ROOT/CLIENT/tauri-client"
+CLIENT="$ROOT/desktop"
 IMAGE="${AWC_LINUX_IMAGE:-awc-linux-build:local}"
 BUNDLES="${1:-deb,appimage}"
 
@@ -67,7 +67,7 @@ run_docker() {
     -v "$pnpm_dir":/opt/pnpm \
     -w /work \
     "$IMAGE" \
-    bash -lc "pnpm --dir CLIENT/tauri-client install --frozen-lockfile --store-dir /tmp/pnpm-store && pnpm --dir CLIENT/tauri-client tauri build --bundles '$BUNDLES'"
+    bash -lc "pnpm --dir desktop install --frozen-lockfile --store-dir /tmp/pnpm-store && pnpm --dir desktop tauri build --bundles '$BUNDLES'"
 }
 
 if host_can_build; then
