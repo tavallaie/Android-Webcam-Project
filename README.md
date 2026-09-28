@@ -104,6 +104,17 @@ Edit in mobile app settings or in code:
 
 ## Building for Production
 
+### Android client
+
+From the repository root:
+
+```bash
+./scripts/build-android.sh debug
+./scripts/build-android.sh release
+```
+
+The APK is written to `android/app/build/outputs/apk/`.
+
 ### Desktop client (Linux)
 
 From the repository root:

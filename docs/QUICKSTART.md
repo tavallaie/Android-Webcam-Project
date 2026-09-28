@@ -12,7 +12,7 @@ For experienced developers who want to get started immediately.
 ```bash
 
 # Android App
-cd android && ./gradlew :app:assembleDebug && cd ..
+./scripts/build-android.sh debug
 
 # Desktop Client
 cd desktop && pnpm install && cd ..
