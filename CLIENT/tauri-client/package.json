@@ -8,7 +8,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:linux": "tauri build --bundles deb,appimage",
+    "build:linux:deb": "tauri build --bundles deb",
+    "build:linux:appimage": "tauri build --bundles appimage"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",

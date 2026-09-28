@@ -96,13 +96,33 @@ Edit in mobile app settings or in code:
 
 ## Building for Production
 
-### Desktop Apps
+### Desktop client (Linux)
+
+From the repository root:
+
 ```bash
-cd desktop-client
+./scripts/build-linux-client.sh
+```
 
-# Windows
-npm run build:win
+That command builds `.deb` and AppImage. Pass `appimage` or `deb` to build one bundle.
 
+```bash
+./scripts/build-linux-client.sh appimage
+```
+
+Output:
+
+- `CLIENT/tauri-client/src-tauri/target/release/bundle/deb/`
+- `CLIENT/tauri-client/src-tauri/target/release/bundle/appimage/`
+
+The script uses Docker when the host is missing GTK, WebKit, v4l, or FFmpeg 8 headers. Host Node, pnpm, and Rust stay required.
+
+When those system packages are already installed:
+
+```bash
+cd CLIENT/tauri-client
+pnpm install
+pnpm run build:linux
 ```
 
 ## Troubleshooting

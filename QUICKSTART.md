@@ -83,7 +83,7 @@ cd desktop-client && npm run build:mac
 
 **Desktop (Linux):**
 ```bash
-cd desktop-client && npm run build:linux
+./scripts/build-linux-client.sh
 ```
 
 ## That's It!

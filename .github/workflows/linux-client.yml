@@ -5,10 +5,12 @@ on:
   push:
     paths:
       - "CLIENT/tauri-client/**"
+      - "scripts/build-linux-client.sh"
       - ".github/workflows/linux-client.yml"
   pull_request:
     paths:
       - "CLIENT/tauri-client/**"
+      - "scripts/build-linux-client.sh"
       - ".github/workflows/linux-client.yml"
 
 permissions:
