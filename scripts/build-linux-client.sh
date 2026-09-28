@@ -25,8 +25,19 @@ host_can_build() {
   [[ "$major" -ge 62 ]]
 }
 
+clean_stale_rust_target() {
+  local target="$CLIENT/src-tauri/target"
+  [[ -d "$target" ]] || return 0
+
+  if rg -a -l -m 1 'CLIENT/tauri-client|/work/CLIENT' "$target" >/dev/null 2>&1; then
+    echo "Removing stale Rust build cache from the old client path."
+    cargo clean --manifest-path "$CLIENT/src-tauri/Cargo.toml"
+  fi
+}
+
 run_native() {
   echo "Building on the host with pnpm."
+  clean_stale_rust_target
   pnpm --dir "$CLIENT" install --frozen-lockfile
   pnpm --dir "$CLIENT" tauri build --bundles "$BUNDLES"
 }
@@ -40,6 +51,8 @@ run_docker() {
     echo "This Docker build uses host Node, pnpm, and Rust. Install those tools first." >&2
     exit 1
   }
+
+  clean_stale_rust_target
 
   local node_dir pnpm_dir cargo_home rustup_home
   node_dir="$(dirname "$(command -v node)")"
