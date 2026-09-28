@@ -67,7 +67,7 @@ run_docker() {
     -v "$pnpm_dir":/opt/pnpm \
     -w /work \
     "$IMAGE" \
-    bash -lc "pnpm --dir CLIENT/tauri-client install --frozen-lockfile && pnpm --dir CLIENT/tauri-client tauri build --bundles '$BUNDLES'"
+    bash -lc "pnpm --dir CLIENT/tauri-client install --frozen-lockfile --store-dir /tmp/pnpm-store && pnpm --dir CLIENT/tauri-client tauri build --bundles '$BUNDLES'"
 }
 
 if host_can_build; then
