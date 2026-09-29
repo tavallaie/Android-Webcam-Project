@@ -31,6 +31,11 @@ Do not push directly to a branch in this table.
 - Branch name format: `short-description`
 - Commit message format: `type: description`
 
+## Pull requests
+
+- One issue per pull request.
+- All pull requests must target `main`.
+
 ## Task protocol
 
 Follow the `task-protocol` skill for a feature, a bug fix, and a ticket.
