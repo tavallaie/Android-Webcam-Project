@@ -6,6 +6,7 @@ on:
     paths:
       - "desktop/**"
       - "scripts/build-linux-client.sh"
+      - "scripts/isolate-appimage-profile.sh"
       - ".github/workflows/linux-client.yml"
   pull_request:
     paths:
@@ -71,16 +72,12 @@ jobs:
         working-directory: desktop
         run: pnpm install --frozen-lockfile
 
-      - uses: tauri-apps/tauri-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: desktop
-          args: --bundles deb,appimage
+      - name: Build Linux bundles
+        run: ./scripts/build-linux-client.sh
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-client
           path: |
-            desktop/src-tauri/target/release/bundle/deb/*.deb
-            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            release/linux/*.deb
+            release/linux/*.AppImage
