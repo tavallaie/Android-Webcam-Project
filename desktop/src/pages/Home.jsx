@@ -706,15 +706,17 @@ function Home() {
                   id="port"
                   readOnly
                   aria-label="Phone HTTP port"
-                  className="field-control w-20"
+                  className="field-control w-14 px-1 text-center"
                 />
                 <button
                   type="button"
                   onClick={discoverPhones}
                   disabled={discoveryLoading || isConnected}
-                  className="field-control w-24 text-[10px] disabled:opacity-50"
+                  aria-label="Discover phones"
+                  title="Discover phones"
+                  className="icon-control h-8 w-8 shrink-0 text-base disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {discoveryLoading ? "Finding…" : "Discover"}
+                  {discoveryLoading ? "⟳" : "🔍"}
                 </button>
               </div>
               <div className="flex items-center justify-between gap-2">

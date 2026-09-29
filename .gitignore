@@ -8,6 +8,7 @@ dist/
 App Key/
 # Local build artifacts
 release/
+plans/
 setup.bat
 setup.sh
 thumb.png
