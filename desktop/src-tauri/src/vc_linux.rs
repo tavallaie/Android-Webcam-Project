@@ -15,7 +15,7 @@ pub const CARD_LABEL: &str = "AWC Virtual Cam";
 pub fn missing_loopback_error() -> String {
     "v4l2loopback is not available or is not configured for video output. Install and load it, then start Virtual Cam again:\n\
      sudo apt-get install v4l2loopback-dkms\n\
-     sudo modprobe v4l2loopback devices=1 card_label=\"AWC Virtual Cam\" exclusive_caps=0"
+     sudo modprobe v4l2loopback devices=1 card_label=\"AWC Virtual Cam\" exclusive_caps=1"
         .to_string()
 }
 
@@ -223,7 +223,7 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
         return;
     };
     println!("Using loopback device {}", path.display());
-    let mut dev = match Device::with_path(&path) {
+    let format_dev = match Device::with_path(&path) {
         Ok(dev) => dev,
         Err(e) => {
             let _ = ready.send(Err(format!(
@@ -238,7 +238,7 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
     // YUYV is what browsers and conferencing apps list as a capture camera.
     let yuyv = FourCC::new(b"YUYV");
     let mut requested =
-        Output::format(&dev).unwrap_or_else(|_| Format::new(v4l_w, height, yuyv));
+        Output::format(&format_dev).unwrap_or_else(|_| Format::new(v4l_w, height, yuyv));
     requested.width = v4l_w;
     requested.height = height;
     requested.fourcc = yuyv;
@@ -248,7 +248,7 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
     for attempt in 0..3 {
         // Reusing the current format avoids a second VIDIOC_S_FMT call when
         // the loopback device retained the same format after disconnect.
-        if let Ok(current) = Output::format(&dev) {
+        if let Ok(current) = Output::format(&format_dev) {
             if current.width == requested.width
                 && current.height == requested.height
                 && current.fourcc == requested.fourcc
@@ -258,7 +258,7 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
             }
         }
 
-        match Output::set_format(&dev, &requested) {
+        match Output::set_format(&format_dev, &requested) {
             Ok(fmt) => {
                 negotiated = Some(fmt);
                 break;
@@ -284,6 +284,22 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
         return;
     };
     println!("Linux vcam format in use:\n{}", fmt);
+
+    // With exclusive_caps=1, v4l2loopback only advertises capture formats
+    // after the producer opens the device as write-only. The v4l crate opens
+    // devices O_RDWR, which leaves Chrome/OBS unable to enumerate this node.
+    drop(format_dev);
+    let mut dev = match std::fs::OpenOptions::new().write(true).open(&path) {
+        Ok(dev) => dev,
+        Err(e) => {
+            let _ = ready.send(Err(format!(
+                "Failed to open {} for video output: {e}",
+                path.display()
+            )));
+            CAM_RUNNING.store(false, Ordering::Relaxed);
+            return;
+        }
+    };
 
     let mut source_rgb = vec![0u8; (width * height * 3) as usize];
     let mut rgb_frame = vec![0u8; (width * height * 3) as usize];
