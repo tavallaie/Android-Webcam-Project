@@ -153,6 +153,9 @@ pub fn init_cam(on: bool, height: u32, width: u32) -> Result<String, String> {
         if let Some(handle) = CAM_THREAD.lock().unwrap().take() {
             let _ = handle.join();
         }
+        // v4l2loopback may need a short interval to release the previous
+        // output handle before accepting another format negotiation.
+        thread::sleep(Duration::from_millis(50));
         return Ok("Virtual camera stopped".into());
     }
     if CAM_RUNNING.load(Ordering::Relaxed) {
@@ -233,24 +236,52 @@ fn start_cam(height: u32, width: u32, ready: mpsc::Sender<Result<String, String>
     };
 
     // YUYV is what browsers and conferencing apps list as a capture camera.
-    let mut fmt =
-        Output::format(&dev).unwrap_or_else(|_| Format::new(v4l_w, height, FourCC::new(b"YUYV")));
-    fmt.width = v4l_w;
-    fmt.height = height;
-    fmt.fourcc = FourCC::new(b"YUYV");
-    let fmt = match Output::set_format(&dev, &fmt) {
-        Ok(fmt) => fmt,
-        Err(_) => match Output::format(&dev) {
-            Ok(fmt) => fmt,
-            Err(e) => {
-                let _ = ready.send(Err(format!(
-                    "Failed to set format on {}: {e}",
-                    path.display()
-                )));
-                CAM_RUNNING.store(false, Ordering::Relaxed);
-                return;
+    let yuyv = FourCC::new(b"YUYV");
+    let mut requested =
+        Output::format(&dev).unwrap_or_else(|_| Format::new(v4l_w, height, yuyv));
+    requested.width = v4l_w;
+    requested.height = height;
+    requested.fourcc = yuyv;
+
+    let mut negotiated = None;
+    let mut last_error = None;
+    for attempt in 0..3 {
+        // Reusing the current format avoids a second VIDIOC_S_FMT call when
+        // the loopback device retained the same format after disconnect.
+        if let Ok(current) = Output::format(&dev) {
+            if current.width == requested.width
+                && current.height == requested.height
+                && current.fourcc == requested.fourcc
+            {
+                negotiated = Some(current);
+                break;
             }
-        },
+        }
+
+        match Output::set_format(&dev, &requested) {
+            Ok(fmt) => {
+                negotiated = Some(fmt);
+                break;
+            }
+            Err(error) => {
+                last_error = Some(error);
+                if attempt < 2 {
+                    thread::sleep(Duration::from_millis(50));
+                }
+            }
+        }
+    }
+
+    let Some(fmt) = negotiated else {
+        let message = last_error
+            .map(|error| error.to_string())
+            .unwrap_or_else(|| "device did not return a usable format".into());
+        let _ = ready.send(Err(format!(
+            "Failed to set format on {} after reconnect attempts: {message}",
+            path.display()
+        )));
+        CAM_RUNNING.store(false, Ordering::Relaxed);
+        return;
     };
     println!("Linux vcam format in use:\n{}", fmt);
 
