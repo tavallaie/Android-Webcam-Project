@@ -13,6 +13,10 @@ target_appimage="$(find "$APPIMAGE_DIR" -maxdepth 1 -type f -name '*.AppImage' -
 }
 
 if ! grep -q 'AWC AppImage profile isolation' "$APP_RUN"; then
+  grep -q '^this_dir=' "$APP_RUN" || {
+    echo "AppImage AppRun is missing the expected this_dir insertion point: $APP_RUN" >&2
+    exit 1
+  }
   sed -i '/^this_dir=/i\
 # AWC AppImage profile isolation: its bundled WebKit must not share state with the DEB.\
 AWC_PROFILE_ROOT="${AWC_PROFILE_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/awc-appimage}"\
@@ -20,6 +24,16 @@ export XDG_DATA_HOME="$AWC_PROFILE_ROOT/data"\
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/awc-appimage"\
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}/awc-appimage"' "$APP_RUN"
 fi
+
+grep -q 'AWC AppImage profile isolation' "$APP_RUN" || {
+  echo "Failed to add AppImage profile isolation to: $APP_RUN" >&2
+  exit 1
+}
+
+[[ -n "$target_appimage" ]] || {
+  echo "No AppImage output exists to replace in: $APPIMAGE_DIR" >&2
+  exit 1
+}
 
 appimage_tool=""
 for cache_dir in "${XDG_CACHE_HOME:-$HOME/.cache}/tauri" /tmp/.cache/tauri; do
@@ -36,6 +50,12 @@ done
 "$appimage_tool" --appimage-extract-and-run --appdir "$APPDIR"
 
 generated_appimage="$ROOT/AWC-x86_64.AppImage"
-if [[ -f "$generated_appimage" && -n "$target_appimage" ]]; then
-  mv "$generated_appimage" "$target_appimage"
-fi
+[[ -f "$generated_appimage" ]] || {
+  echo "Repacker did not produce: $generated_appimage" >&2
+  exit 1
+}
+mv "$generated_appimage" "$target_appimage"
+[[ -f "$target_appimage" ]] || {
+  echo "Repacked AppImage was not installed at: $target_appimage" >&2
+  exit 1
+}
