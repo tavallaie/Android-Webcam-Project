@@ -7,7 +7,10 @@ APPDIR="$APPIMAGE_DIR/AWC.AppDir"
 APP_RUN="$APPDIR/AppRun"
 target_appimage="$(find "$APPIMAGE_DIR" -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
 
-[[ -f "$APP_RUN" ]] || exit 0
+[[ -f "$APP_RUN" ]] || {
+  echo "AppImage AppDir is missing its AppRun launcher: $APPDIR" >&2
+  exit 1
+}
 
 if ! grep -q 'AWC AppImage profile isolation' "$APP_RUN"; then
   sed -i '/^this_dir=/i\
